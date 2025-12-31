@@ -2,156 +2,183 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GlassCall Pro - Fixed Manual</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GlassCall Pro - Manual</title>
     <style>
-        :root { --glass: rgba(255, 255, 255, 0.1); --accent: #00f2fe; --danger: #ff4d4d; }
-        body { font-family: 'Inter', sans-serif; background: #0f172a; color: white; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
+        :root { --glass: rgba(255, 255, 255, 0.1); --accent: #00f2fe; --danger: #ff4d4d; --bg: #0f172a; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; font-family: 'Inter', sans-serif; background: var(--bg); color: white; overflow: hidden; }
         
-        .wizard-card { background: var(--glass); backdrop-filter: blur(25px); padding: 30px; border-radius: 28px; border: 1px solid rgba(255,255,255,0.2); width: 95%; max-width: 450px; text-align: center; }
+        /* Wizard Containers */
+        #wizard-overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle, #1e293b, #0f172a); z-index: 1000; padding: 20px; }
+        .card { background: var(--glass); backdrop-filter: blur(25px); padding: 30px; border-radius: 28px; border: 1px solid rgba(255,255,255,0.2); width: 100%; max-width: 450px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
         .step { display: none; }
-        .step.active { display: block; animation: fadeIn 0.4s; }
-        
-        textarea { width: 100%; height: 110px; background: rgba(0,0,0,0.4); color: var(--accent); border: 1px solid var(--glass); border-radius: 12px; padding: 10px; font-size: 10px; margin: 15px 0; resize: none; word-break: break-all; }
-        .btn { width: 100%; padding: 14px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; transition: 0.2s; margin-top: 10px; }
+        .step.active { display: block; animation: slideUp 0.4s ease; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Inputs & Buttons */
+        textarea { width: 100%; height: 100px; background: rgba(0,0,0,0.4); color: var(--accent); border: 1px solid var(--glass); border-radius: 12px; padding: 12px; font-size: 10px; margin: 15px 0; resize: none; word-break: break-all; outline: none; }
+        .btn { width: 100%; padding: 14px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; transition: 0.2s; margin-top: 10px; font-family: inherit; }
         .btn-main { background: var(--accent); color: #000; }
-        .btn-ghost { background: var(--glass); color: white; }
+        .btn-ghost { background: var(--glass); color: white; border: 1px solid var(--glass-thick); }
+        .loader { font-size: 12px; color: var(--accent); margin-bottom: 10px; display: none; }
 
-        /* Status Loader */
-        .loader { font-size: 12px; color: var(--accent); margin: 10px 0; display: none; }
-
-        /* Meeting UI */
-        #meeting-ui { display: none; position: fixed; inset: 0; background: #000; z-index: 2000; }
-        .navbar { position: absolute; top:0; width:100%; height:60px; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:space-between; padding:0 20px; box-sizing:border-box;}
-        #local-container { position: absolute; width: 150px; aspect-ratio: 16/9; top: 70px; right: 20px; border-radius: 12px; overflow: hidden; border: 2px solid white; z-index: 100; cursor: move; }
-        #remoteVideo { width: 100%; height: 100%; object-fit: cover; }
-        .controls { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; background: rgba(0,0,0,0.7); padding: 10px 20px; border-radius: 30px; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        /* Call Interface */
+        #call-ui { display: none; width: 100%; height: 100%; position: relative; }
+        #remoteVideo { width: 100%; height: 100%; object-fit: cover; background: #000; }
+        #local-container { position: absolute; width: 160px; aspect-ratio: 16/9; top: 80px; right: 20px; z-index: 500; cursor: move; border-radius: 16px; overflow: hidden; border: 2px solid var(--glass); box-shadow: 0 10px 30px rgba(0,0,0,0.5); touch-action: none; }
+        #localVideo { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+        .controls { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 12px; padding: 12px 25px; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(20px); border-radius: 40px; border: 1px solid var(--glass); z-index: 600; }
+        .btn-circle { width: 48px; height: 48px; border-radius: 50%; border: none; cursor: pointer; font-size: 20px; background: var(--glass); color: white; display: flex; align-items: center; justify-content: center; }
+        
+        @media (max-width: 768px) { #local-container { width: 120px; top: 70px; } .controls { bottom: 20px; width: 95%; justify-content: space-around; } }
     </style>
 </head>
 <body>
 
-    <div id="setup-wizard" class="wizard-card">
-        <div id="step-start" class="step active">
-            <h2 style="color:var(--accent)">GlassCall Private</h2>
-            <p style="opacity:0.8; font-size:14px;">Establish a secure P2P video call manually.</p>
-            <button class="btn btn-main" onclick="initCall('host')">Host Meeting</button>
-            <button class="btn btn-ghost" onclick="initCall('guest')">Join Meeting</button>
-        </div>
+    <div id="wizard-overlay">
+        <div class="card">
+            <div id="s1" class="step active">
+                <h2 style="color:var(--accent); margin-bottom: 5px;">GlassCall Pro</h2>
+                <p style="opacity:0.7; font-size: 14px;">Serverless Private Video Call</p>
+                <button class="btn btn-main" onclick="initProcess('host')">Host Meeting</button>
+                <button class="btn btn-ghost" onclick="initProcess('guest')">Join Meeting</button>
+            </div>
 
-        <div id="step-host-1" class="step">
-            <h3>1. Share Invite</h3>
-            <div id="host-loader" class="loader">Gathering network paths... Please wait.</div>
-            <textarea id="hostOfferDisplay" readonly placeholder="Waiting for media..."></textarea>
-            <button class="btn btn-main" id="hostCopyBtn" onclick="copy('hostOfferDisplay')" disabled>Copy Invite Code</button>
-            <button class="btn btn-ghost" onclick="showStep('step-host-2')">Next: I have Partner's Answer</button>
-        </div>
-        <div id="step-host-2" class="step">
-            <h3>2. Finalize</h3>
-            <p style="font-size:12px">Paste the code sent by your partner.</p>
-            <textarea id="hostAnswerInput" placeholder="Paste Answer here..."></textarea>
-            <button class="btn btn-main" onclick="connectHost()">Start Video</button>
-        </div>
+            <div id="host-gen" class="step">
+                <h3>Host: Generate Code</h3>
+                <div id="h-loader" class="loader">Gathering network paths...</div>
+                <textarea id="code1" readonly placeholder="Generating..."></textarea>
+                <button class="btn btn-main" id="h-copy" onclick="copy('code1')" disabled>Copy Code 1</button>
+                <button class="btn btn-ghost" onclick="showStep('host-paste')">Next: I have Answer Code</button>
+            </div>
+            <div id="host-paste" class="step">
+                <h3>Host: Final Connect</h3>
+                <p style="font-size:12px; opacity:0.8;">Paste the Answer Code (Code 2) from Device 2.</p>
+                <textarea id="code2-input" placeholder="Paste Code 2 here..."></textarea>
+                <button class="btn btn-main" onclick="finalizeHost()">Establish Connection</button>
+            </div>
 
-        <div id="step-guest-1" class="step">
-            <h3>1. Receive Invite</h3>
-            <p style="font-size:12px">Paste the invite code from the host.</p>
-            <textarea id="guestOfferInput" placeholder="Paste Invite here..."></textarea>
-            <button class="btn btn-main" onclick="handleGuestOffer()">Process & Generate Answer</button>
-        </div>
-        <div id="step-guest-2" class="step">
-            <h3>2. Reply to Host</h3>
-            <div id="guest-loader" class="loader">Generating secure answer... Please wait.</div>
-            <textarea id="guestAnswerDisplay" readonly placeholder="Generating code..."></textarea>
-            <button class="btn btn-main" id="guestCopyBtn" onclick="copy('guestAnswerDisplay')" disabled>Copy Answer Code</button>
-            <p style="font-size:10px; margin-top:10px;">Send this back to the host. The call will start automatically.</p>
+            <div id="guest-input" class="step">
+                <h3>Guest: Join Meeting</h3>
+                <p style="font-size:12px; opacity:0.8;">Paste the Invite Code (Code 1) from Device 1.</p>
+                <textarea id="code1-input" placeholder="Paste Code 1 here..."></textarea>
+                <button class="btn btn-main" onclick="generateAnswer()">Generate Answer Code</button>
+            </div>
+            <div id="guest-gen" class="step">
+                <h3>Guest: Share Answer</h3>
+                <div id="g-loader" class="loader">Generating secure answer...</div>
+                <textarea id="code2" readonly></textarea>
+                <button class="btn btn-main" id="g-copy" onclick="copy('code2')" disabled>Copy Code 2</button>
+                <button class="btn btn-ghost" onclick="finalizeGuest()">Establish Connection</button>
+            </div>
         </div>
     </div>
 
-    <div id="meeting-ui">
-        <nav class="navbar">
-            <div style="color:var(--accent); font-size:12px;">● PRIVATE P2P</div>
-            <div style="font-weight:bold;">GlassCall</div>
-            <button onclick="togglePip()" style="background:none; border:none; color:white; font-size:18px;">🖼️</button>
-        </nav>
-        <div id="local-container"><video id="localVideo" style="width:100%;height:100%;object-fit:cover" autoplay muted playsinline></video></div>
+    <div id="call-ui">
+        <div id="local-container"><video id="localVideo" autoplay muted playsinline></video></div>
         <video id="remoteVideo" autoplay playsinline></video>
         <div class="controls">
-            <button onclick="toggleMic()" class="btn" style="width:45px;height:45px;border-radius:50%">🎤</button>
-            <button onclick="toggleCam()" class="btn" style="width:45px;height:45px;border-radius:50%">📷</button>
-            <button onclick="location.reload()" class="btn" style="width:45px;height:45px;border-radius:50%;background:var(--danger)">📞</button>
+            <button onclick="toggleMic()" id="mBtn" class="btn-circle">🎤</button>
+            <button onclick="toggleCam()" id="vBtn" class="btn-circle">📷</button>
+            <button onclick="togglePip()" class="btn-circle">🖼️</button>
+            <button onclick="location.reload()" class="btn-circle" style="background:var(--danger)">📞</button>
         </div>
     </div>
 
     <script>
         let pc, localStream;
-        const iceConfig = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+        const iceServers = [{ urls: "stun:stun.l.google.com:19302" }];
 
-        function showStep(id) {
-            document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
-        }
+        function showStep(id) { document.querySelectorAll('.step').forEach(s => s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+        function copy(id) { const t = document.getElementById(id); t.select(); document.execCommand('copy'); alert("Copied!"); }
 
-        function copy(id) {
-            const el = document.getElementById(id);
-            el.select(); document.execCommand('copy');
-            alert("Code copied!");
-        }
-
-        async function initCall(role) {
-            localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
-            document.getElementById('localVideo').srcObject = localStream;
-            
-            pc = new RTCPeerConnection(iceConfig);
-            localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
-            pc.ontrack = e => {
-                document.getElementById('remoteVideo').srcObject = e.streams[0];
-                document.getElementById('setup-wizard').style.display = 'none';
-                document.getElementById('meeting-ui').style.display = 'block';
-            };
-
-            if(role === 'host') {
-                showStep('step-host-1');
-                document.getElementById('host-loader').style.display = 'block';
-                const offer = await pc.createOffer();
-                await pc.setLocalDescription(offer);
+        async function initProcess(role) {
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
+                document.getElementById('localVideo').srcObject = localStream;
+                pc = new RTCPeerConnection({ iceServers });
+                localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
                 
-                pc.onicecandidate = e => {
-                    if (!e.candidate) {
-                        document.getElementById('host-loader').style.display = 'none';
-                        document.getElementById('hostOfferDisplay').value = btoa(JSON.stringify(pc.localDescription));
-                        document.getElementById('hostCopyBtn').disabled = false;
+                // Connection Watcher: Redirect when LIVE
+                pc.onconnectionstatechange = () => {
+                    if (pc.connectionState === 'connected') {
+                        document.getElementById('wizard-overlay').style.display = 'none';
+                        document.getElementById('call-ui').style.display = 'block';
                     }
                 };
-            } else { showStep('step-guest-1'); }
+
+                pc.ontrack = e => { document.getElementById('remoteVideo').srcObject = e.streams[0]; };
+
+                if(role === 'host') {
+                    showStep('host-gen');
+                    document.getElementById('h-loader').style.display = 'block';
+                    const offer = await pc.createOffer();
+                    await pc.setLocalDescription(offer);
+                    pc.onicecandidate = e => {
+                        if (!e.candidate) {
+                            document.getElementById('h-loader').style.display = 'none';
+                            document.getElementById('code1').value = btoa(JSON.stringify(pc.localDescription));
+                            document.getElementById('h-copy').disabled = false;
+                        }
+                    };
+                } else showStep('guest-input');
+            } catch(e) { alert("Please allow camera access."); }
         }
 
-        async function handleGuestOffer() {
-            const offerData = JSON.parse(atob(document.getElementById('guestOfferInput').value));
-            await pc.setRemoteDescription(new RTCSessionDescription(offerData));
+        async function generateAnswer() {
+            const offer = JSON.parse(atob(document.getElementById('code1-input').value));
+            await pc.setRemoteDescription(new RTCSessionDescription(offer));
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
             
-            showStep('step-guest-2');
-            document.getElementById('guest-loader').style.display = 'block';
-            
+            showStep('guest-gen');
+            document.getElementById('g-loader').style.display = 'block';
             pc.onicecandidate = e => {
                 if (!e.candidate) {
-                    document.getElementById('guest-loader').style.display = 'none';
-                    document.getElementById('guestAnswerDisplay').value = btoa(JSON.stringify(pc.localDescription));
-                    document.getElementById('guestCopyBtn').disabled = false;
+                    document.getElementById('g-loader').style.display = 'none';
+                    document.getElementById('code2').value = btoa(JSON.stringify(pc.localDescription));
+                    document.getElementById('g-copy').disabled = false;
                 }
             };
         }
 
-        async function connectHost() {
-            const answerData = JSON.parse(atob(document.getElementById('hostAnswerInput').value));
-            await pc.setRemoteDescription(new RTCSessionDescription(answerData));
+        async function finalizeHost() {
+            const answer = JSON.parse(atob(document.getElementById('code2-input').value));
+            await pc.setRemoteDescription(new RTCSessionDescription(answer));
         }
 
-        function toggleMic() { localStream.getAudioTracks()[0].enabled = !localStream.getAudioTracks()[0].enabled; }
-        function toggleCam() { localStream.getVideoTracks()[0].enabled = !localStream.getVideoTracks()[0].enabled; }
-        function togglePip() { document.getElementById('remoteVideo').requestPictureInPicture(); }
+        function finalizeGuest() {
+            // Guest is already waiting for the Host to complete the handshake.
+            // As soon as the Host pastes the code, pc.onconnectionstatechange will trigger the UI.
+            alert("Waiting for Host to finalize connection...");
+        }
+
+        function toggleMic() { const t = localStream.getAudioTracks()[0]; t.enabled = !t.enabled; document.getElementById('mBtn').style.background = t.enabled ? 'var(--glass)' : 'var(--danger)'; }
+        function toggleCam() { const t = localStream.getVideoTracks()[0]; t.enabled = !t.enabled; document.getElementById('vBtn').style.background = t.enabled ? 'var(--glass)' : 'var(--danger)'; }
+        function togglePip() { if(document.pictureInPictureElement) document.exitPictureInPicture(); else document.getElementById('remoteVideo').requestPictureInPicture(); }
+
+        // Draggable Logic (Reduced for brevity)
+        const dragItem = document.getElementById("local-container");
+        let active = false, currentX, currentY, initialX, initialY, xOffset = 0, yOffset = 0;
+        const dragStart = (e) => {
+            initialX = (e.type === "touchstart" ? e.touches[0].clientX : e.clientX) - xOffset;
+            initialY = (e.type === "touchstart" ? e.touches[0].clientY : e.clientY) - yOffset;
+            if (e.target === dragItem || dragItem.contains(e.target)) active = true;
+        };
+        const dragEnd = () => { initialX = currentX; initialY = currentY; active = false; };
+        const drag = (e) => { if (active) {
+            e.preventDefault();
+            currentX = (e.type === "touchmove" ? e.touches[0].clientX : e.clientX) - initialX;
+            currentY = (e.type === "touchmove" ? e.touches[0].clientY : e.clientY) - initialY;
+            xOffset = currentX; yOffset = currentY;
+            dragItem.style.transform = `translate3d(${currentX}px, ${currentY}px, 0)`;
+        }};
+        document.addEventListener("touchstart", dragStart, {passive: false});
+        document.addEventListener("touchmove", drag, {passive: false});
+        document.addEventListener("touchend", dragEnd);
+        document.addEventListener("mousedown", dragStart);
+        document.addEventListener("mousemove", drag);
+        document.addEventListener("mouseup", dragEnd);
     </script>
 </body>
 </html>
