@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Private GlassCall (Serverless)</title>
+    <style>
+        :root {
+            --glass: rgba(255, 255, 255, 0.1);
+            --glass-thick: rgba(255, 255, 255, 0.2);
+            --accent: #00f2fe;
+            --danger: #ff4d4d;
+            --bg-dark: #0f172a;
+        }
+
+        body, html { 
+            margin: 0; padding: 0; width: 100%; height: 100%; 
+            font-family: 'Inter', sans-serif; background: var(--bg-dark); 
+            color: white; overflow: hidden;
+        }
+
+        /* --- UI PANELS --- */
+        #setup-area {
+            position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+            background: radial-gradient(circle, #1e293b, #0f172a); z-index: 1000;
+        }
+        .panel {
+            background: var(--glass); backdrop-filter: blur(20px);
+            padding: 30px; border-radius: 28px; border: 1px solid var(--glass-thick);
+            text-align: center; width: 90%; max-width: 500px;
+        }
+
+        textarea {
+            width: 100%; height: 80px; background: rgba(0,0,0,0.3); color: var(--accent);
+            border: 1px solid var(--glass-thick); border-radius: 10px; padding: 10px;
+            font-size: 10px; margin: 10px 0; resize: none;
+        }
+
+        /* --- MEETING UI --- */
+        #meeting-ui { display: none; width: 100%; height: 100%; position: relative; }
+        .navbar {
+            position: absolute; top: 0; left: 0; right: 0; height: 60px;
+            background: var(--glass); backdrop-filter: blur(15px);
+            display: flex; align-items: center; justify-content: space-between; padding: 0 20px; z-index: 800;
+        }
+
+        #local-container {
+            position: absolute; width: 160px; aspect-ratio: 16/9;
+            top: 80px; right: 20px; z-index: 500; cursor: move;
+            border-radius: 16px; overflow: hidden; border: 2px solid var(--glass-thick);
+            touch-action: none;
+        }
+        #localVideo { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+
+        .stage { width: 100%; height: 100%; background: #000; display: flex; align-items: center; justify-content: center; }
+        #remoteVideo { width: 100%; height: 100%; object-fit: cover; }
+
+        .controls {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+            display: flex; gap: 12px; padding: 12px 25px;
+            background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(20px);
+            border-radius: 40px; border: 1px solid var(--glass-thick); z-index: 600;
+        }
+        .btn {
+            width: 48px; height: 48px; border-radius: 50%; border: none;
+            cursor: pointer; font-size: 20px; background: var(--glass-thick); color: white;
+            transition: 0.3s; display: flex; align-items: center; justify-content: center;
+        }
+        .btn.off { background: var(--danger); }
+    </style>
+</head>
+<body>
+
+    <div id="setup-area">
+        <div class="panel" id="step1">
+            <h2>Private Connection</h2>
+            <p style="font-size: 14px; opacity: 0.7;">No signaling server used. Manual P2P exchange only.</p>
+            <button onclick="startCall(true)" class="btn" style="width:100%; border-radius:12px; background:var(--accent); color:#000; font-weight:bold; margin-top:10px;">Create Offer (Host)</button>
+            <button onclick="startCall(false)" class="btn" style="width:100%; border-radius:12px; background:var(--glass-thick); color:white; font-weight:bold; margin-top:10px;">Join with Offer (Guest)</button>
+        </div>
+
+        <div class="panel" id="handshake-panel" style="display:none;">
+            <h3 id="handshake-title">Handshake</h3>
+            <p id="instruction" style="font-size: 12px;"></p>
+            <textarea id="sdpBox" readonly></textarea>
+            <button onclick="copySDP()" id="copyBtn" class="btn" style="width:100%; border-radius:10px; background:var(--accent); color:#000; font-size:14px;">Copy Text</button>
+            
+            <p style="margin-top:15px; font-size:12px;">Paste received text here:</p>
+            <textarea id="inputBox" placeholder="Paste response here..."></textarea>
+            <button onclick="processInput()" class="btn" style="width:100%; border-radius:10px; background:var(--accent); color:#000; font-size:14px;">Connect</button>
+        </div>
+    </div>
+
+    <div id="meeting-ui">
+        <nav class="navbar">
+            <div style="font-size:14px; color:var(--accent); font-weight:bold;">● P2P PRIVATE</div>
+            <div style="font-weight: 800; font-size: 20px; color: white;">GlassCall</div>
+            <button id="pipBtn" class="btn" style="width: 35px; height: 35px; font-size: 14px;">🖼️</button>
+        </nav>
+
+        <div id="local-container"><video id="localVideo" autoplay muted playsinline></video></div>
+        <div class="stage"><video id="remoteVideo" autoplay playsinline></video></div>
+
+        <div class="controls">
+            <button onclick="toggleMic()" id="micBtn" class="btn">🎤</button>
+            <button onclick="toggleCam()" id="camBtn" class="btn">📷</button>
+            <button onclick="togglePip()" class="btn">🖼️</button>
+            <button onclick="location.reload()" class="btn" style="background:var(--danger)">📞</button>
+        </div>
+    </div>
+
+    <script>
+        // --- DRAGGABLE ---
+        const dragItem = document.getElementById("local-container");
+        let active = false, currentX, currentY, initialX, initialY, xOffset = 0, yOffset = 0;
+        const dragStart = (e) => {
+            initialX = (e.type === "touchstart" ? e.touches[0].clientX : e.clientX) - xOffset;
+            initialY = (e.type === "touchstart" ? e.touches[0].clientY : e.clientY) - yOffset;
+            if (e.target === dragItem || dragItem.contains(e.target)) active = true;
+        };
+        const dragEnd = () => { initialX = currentX; initialY = currentY; active = false; };
+        const drag = (e) => {
+            if (active) {
+                e.preventDefault();
+                currentX = (e.type === "touchmove" ? e.touches[0].clientX : e.clientX) - initialX;
+                currentY = (e.type === "touchmove" ? e.touches[0].clientY : e.clientY) - initialY;
+                xOffset = currentX; yOffset = currentY;
+                dragItem.style.transform = `translate3d(${currentX}px, ${currentY}px, 0)`;
+            }
+        };
+        document.addEventListener("touchstart", dragStart, {passive: false});
+        document.addEventListener("touchmove", drag, {passive: false});
+        document.addEventListener("touchend", dragEnd);
+        document.addEventListener("mousedown", dragStart);
+        document.addEventListener("mousemove", drag);
+        document.addEventListener("mouseup", dragEnd);
+
+        // --- WebRTC MANUAL LOGIC ---
+        let localStream, pc;
+        const iceConfig = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+
+        async function startCall(isHost) {
+            document.getElementById('step1').style.display = 'none';
+            document.getElementById('handshake-panel').style.display = 'block';
+            
+            localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
+            document.getElementById('localVideo').srcObject = localStream;
+
+            pc = new RTCPeerConnection(iceConfig);
+            localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+            pc.ontrack = e => {
+                document.getElementById('remoteVideo').srcObject = e.streams[0];
+                document.getElementById('setup-area').style.display = 'none';
+                document.getElementById('meeting-ui').style.display = 'block';
+            };
+
+            if (isHost) {
+                document.getElementById('instruction').innerText = "1. Copy this offer and send it to your partner. 2. Paste their 'Answer' below.";
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                // We must wait for ICE candidates to gather before showing the final SDP
+                pc.onicecandidate = e => {
+                    if (!e.candidate) document.getElementById('sdpBox').value = btoa(JSON.stringify(pc.localDescription));
+                };
+            } else {
+                document.getElementById('instruction').innerText = "1. Paste the 'Offer' from your partner below. 2. Copy the generated 'Answer' and send it back.";
+                document.getElementById('sdpBox').placeholder = "Your Answer will appear here after you paste the Offer...";
+            }
+        }
+
+        async function processInput() {
+            const input = JSON.parse(atob(document.getElementById('inputBox').value));
+            if (input.type === "offer") {
+                await pc.setRemoteDescription(new RTCSessionDescription(input));
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+                pc.onicecandidate = e => {
+                    if (!e.candidate) document.getElementById('sdpBox').value = btoa(JSON.stringify(pc.localDescription));
+                };
+            } else if (input.type === "answer") {
+                await pc.setRemoteDescription(new RTCSessionDescription(input));
+            }
+        }
+
+        function copySDP() {
+            const copyText = document.getElementById("sdpBox");
+            copyText.select();
+            document.execCommand("copy");
+            alert("Copied! Send this to your partner.");
+        }
+
+        function toggleMic() { const t = localStream.getAudioTracks()[0]; t.enabled = !t.enabled; document.getElementById('micBtn').classList.toggle('off', !t.enabled); }
+        function toggleCam() { const t = localStream.getVideoTracks()[0]; t.enabled = !t.enabled; document.getElementById('camBtn').classList.toggle('off', !t.enabled); }
+        function togglePip() { document.getElementById('remoteVideo').requestPictureInPicture(); }
+    </script>
+</body>
+</html>
