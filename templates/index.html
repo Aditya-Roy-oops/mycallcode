@@ -3,215 +3,234 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GlassCall Pro - Ultimate</title>
-    <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
+    <title>GlassCall Ultimate</title>
     <style>
-        :root { --glass: rgba(255, 255, 255, 0.1); --glass-thick: rgba(255, 255, 255, 0.2); --accent: #00f2fe; --danger: #ff4d4d; --bg: #0f172a; --success: #10b981; }
+        :root { --glass: rgba(255, 255, 255, 0.1); --accent: #00f2fe; --danger: #ff4d4d; --bg: #0b0e14; }
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; font-family: 'Inter', sans-serif; background: var(--bg); color: white; overflow: hidden; }
-        
-        /* Wizard Overlay */
-        #wizard-overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle, #1e293b, #0f172a); z-index: 1000; padding: 20px; }
-        .card { background: var(--glass); backdrop-filter: blur(25px); padding: 30px; border-radius: 28px; border: 1px solid rgba(255,255,255,0.2); width: 100%; max-width: 450px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+
+        /* Wizard UI */
+        #wizard-box { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle, #1e293b, #0b0e14); z-index: 1000; padding: 20px; }
+        .card { background: var(--glass); backdrop-filter: blur(25px); padding: 30px; border-radius: 28px; border: 1px solid rgba(255,255,255,0.2); width: 100%; max-width: 450px; text-align: center; }
         .step { display: none; }
-        .step.active { display: block; animation: slideUp 0.4s ease; }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-
-        textarea { width: 100%; height: 100px; background: rgba(0,0,0,0.4); color: var(--accent); border: 1px solid var(--glass); border-radius: 12px; padding: 12px; font-size: 10px; margin: 15px 0; resize: none; word-break: break-all; outline: none; }
-        .btn { width: 100%; padding: 14px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; transition: 0.2s; margin-top: 10px; }
+        .step.active { display: block; }
+        textarea { width: 100%; height: 100px; background: rgba(0,0,0,0.4); color: var(--accent); border: 1px solid var(--glass); border-radius: 12px; padding: 10px; font-size: 10px; margin: 10px 0; resize: none; word-break: break-all; outline: none; }
+        .btn { width: 100%; padding: 14px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; margin-top: 10px; }
         .btn-main { background: var(--accent); color: #000; }
-        .btn-ghost { background: var(--glass); color: white; border: 1px solid var(--glass-thick); }
+        .btn-ghost { background: var(--glass); color: white; }
 
-        /* Call UI */
-        #call-ui { display: none; width: 100%; height: 100%; position: relative; }
-        .navbar { position: absolute; top: 0; width: 100%; height: 60px; background: var(--glass); backdrop-filter: blur(15px); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; box-sizing: border-box; z-index: 800; border-bottom: 1px solid var(--glass-thick); }
-        #remoteVideo { width: 100%; height: 100%; object-fit: cover; background: #000; }
-        #local-container { position: absolute; width: 160px; aspect-ratio: 16/9; top: 80px; right: 20px; z-index: 500; cursor: move; border-radius: 16px; overflow: hidden; border: 2px solid var(--glass); touch-action: none; }
-        #localVideo { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+        /* Meeting UI */
+        #meeting-ui { display: none; width: 100vw; height: 100vh; flex-direction: column; }
+        .top-bar { height: 60px; background: var(--glass); backdrop-filter: blur(15px); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; border-bottom: 1px solid var(--glass); }
+        .stage { flex: 1; background: #000; display: flex; align-items: center; justify-content: center; position: relative; }
+        #remoteVideo { width: 100%; height: 100%; object-fit: contain; }
         
-        /* Strength Indicator */
-        .strength-meter { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--success); }
-        .dot { width: 8px; height: 8px; background: var(--success); border-radius: 50%; box-shadow: 0 0 10px var(--success); }
+        /* Local Video - Draggable */
+        #local-container { position: absolute; width: 150px; aspect-ratio: 16/9; top: 20px; right: 20px; border-radius: 12px; overflow: hidden; border: 2px solid white; z-index: 500; cursor: move; }
+        #localVideo { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
 
-        /* Chat Panel */
-        #chat-panel { position: fixed; right: 20px; bottom: 100px; width: 320px; height: 400px; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(25px); border-radius: 24px; border: 1px solid var(--glass-thick); display: none; flex-direction: column; z-index: 700; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
-        #chat-body { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; scroll-behavior: smooth; }
-        .msg { padding: 8px 12px; border-radius: 12px; max-width: 80%; font-size: 14px; word-wrap: break-word; }
-        .msg.sent { align-self: flex-end; background: var(--accent); color: #000; }
-        .msg.received { align-self: flex-start; background: var(--glass-thick); color: #fff; }
+        /* Bottom Controls */
+        .bottom-bar { height: 80px; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; gap: 15px; padding: 0 10px; }
+        .circle-btn { width: 50px; height: 50px; border-radius: 50%; border: none; background: var(--glass); color: white; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .circle-btn.off { background: var(--danger); }
 
-        .controls { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 12px; padding: 12px 25px; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(20px); border-radius: 40px; border: 1px solid var(--glass); z-index: 600; }
-        .btn-circle { width: 48px; height: 48px; border-radius: 50%; border: none; cursor: pointer; font-size: 20px; background: var(--glass); color: white; display: flex; align-items: center; justify-content: center; }
+        /* Features: Chat & Progress */
+        #chat-panel { position: fixed; right: 20px; bottom: 100px; width: 320px; height: 400px; background: rgba(15, 23, 42, 0.95); border-radius: 20px; display: none; flex-direction: column; z-index: 700; border: 1px solid var(--glass); }
+        #progress-bar { width: 100%; height: 4px; background: var(--accent); position: absolute; top: 0; left: 0; display: none; }
+
+        @media (max-width: 768px) { #local-container { width: 110px; } .circle-btn { width: 42px; height: 42px; font-size: 16px; } }
     </style>
 </head>
 <body>
 
-    <div id="wizard-overlay">
+    <div id="wizard-box">
         <div class="card">
             <div id="s1" class="step active">
                 <h2 style="color:var(--accent)">GlassCall Pro</h2>
-                <button class="btn btn-main" onclick="initProcess('host')">Host Meeting</button>
-                <button class="btn btn-ghost" onclick="initProcess('guest')">Join Meeting</button>
+                <button class="btn btn-main" onclick="init('host')">Host Meeting</button>
+                <button class="btn btn-ghost" onclick="init('guest')">Join Meeting</button>
             </div>
-            <div id="host-gen" class="step">
+            <div id="h-gen" class="step">
                 <h3>Host: Step 1</h3>
-                <textarea id="code1" readonly placeholder="Generating Code 1..."></textarea>
-                <button class="btn btn-main" id="h-copy" onclick="copy('code1')" disabled>Copy Code 1</button>
-                <button class="btn btn-ghost" onclick="showStep('host-paste')">Next: Paste Code 2</button>
+                <p style="font-size:12px">Copy Code 1 and send to partner.</p>
+                <textarea id="c1" readonly></textarea>
+                <button class="btn btn-main" id="h-copy" onclick="copy('c1')" disabled>Copy Code 1</button>
+                <button class="btn btn-ghost" onclick="show('h-paste')">Next: I have Code 2</button>
             </div>
-            <div id="host-paste" class="step">
-                <h3>Host: Final Step</h3>
-                <textarea id="code2-input" placeholder="Paste Code 2 here..."></textarea>
-                <button class="btn btn-main" onclick="finalizeHost()">Establish Connection</button>
+            <div id="h-paste" class="step">
+                <h3>Host: Step 2</h3>
+                <textarea id="c2-in" placeholder="Paste Code 2 here..."></textarea>
+                <button class="btn btn-main" onclick="finalizeHost()">Connect</button>
             </div>
-            <div id="guest-input" class="step">
+            <div id="g-in" class="step">
                 <h3>Guest: Step 1</h3>
-                <textarea id="code1-input" placeholder="Paste Code 1 here..."></textarea>
-                <button class="btn btn-main" onclick="generateAnswer()">Generate Code 2</button>
+                <textarea id="c1-in" placeholder="Paste Code 1 here..."></textarea>
+                <button class="btn btn-main" onclick="genAnswer()">Generate Code 2</button>
             </div>
-            <div id="guest-gen" class="step">
+            <div id="g-gen" class="step">
                 <h3>Guest: Step 2</h3>
-                <textarea id="code2" readonly></textarea>
-                <button class="btn btn-main" id="g-copy" onclick="copy('code2')" disabled>Copy Code 2</button>
-                <button class="btn btn-ghost">Waiting for Connection...</button>
+                <textarea id="c2" readonly></textarea>
+                <button class="btn btn-main" id="g-copy" onclick="copy('c2')" disabled>Copy Code 2</button>
+                <button class="btn btn-ghost">Waiting for Host...</button>
             </div>
         </div>
     </div>
 
-    <div id="call-ui">
-        <nav class="navbar">
-            <div class="strength-meter"><div class="dot"></div><span id="quality">Excellent</span></div>
-            <div style="font-weight: 800; font-size: 18px; color: #fff;">GlassCall<span style="color:var(--accent)">.</span></div>
-            <button onclick="togglePip()" style="background:none; border:none; color:white; font-size:18px; cursor:pointer;">🖼️</button>
+    <div id="meeting-ui">
+        <div id="progress-bar"></div>
+        <nav class="top-bar">
+            <div id="strength" style="font-size:12px; color:var(--accent)">Strength: ---</div>
+            <div style="font-weight:bold">GlassCall.</div>
+            <button onclick="togglePip()" style="background:none; border:none; color:white; font-size:18px; cursor:pointer">🖼️</button>
         </nav>
+        
+        <div class="stage">
+            <div id="local-container"><video id="localVideo" autoplay muted playsinline></video></div>
+            <video id="remoteVideo" autoplay playsinline></video>
+        </div>
 
-        <div id="local-container"><video id="localVideo" autoplay muted playsinline></video></div>
-        <video id="remoteVideo" autoplay playsinline></video>
-
-        <div class="controls">
-            <button onclick="toggleMic()" id="mBtn" class="btn-circle">🎤</button>
-            <button onclick="toggleCam()" id="vBtn" class="btn-circle">📷</button>
-            <button onclick="toggleChat()" class="btn-circle">💬</button>
-            <button onclick="location.reload()" class="btn-circle" style="background:var(--danger)">📞</button>
+        <div class="bottom-bar">
+            <button onclick="toggleMic()" id="m-btn" class="circle-btn">🎤</button>
+            <button onclick="toggleCam()" id="v-btn" class="circle-btn">📷</button>
+            <button onclick="toggleChat()" class="circle-btn">💬</button>
+            <input type="file" id="fileIn" style="display:none" onchange="sendFile()">
+            <button onclick="document.getElementById('fileIn').click()" class="circle-btn">📎</button>
+            <button onclick="toggleShare()" id="s-btn" class="circle-btn">📺</button>
+            <button onclick="location.reload()" class="circle-btn" style="background:var(--danger)">📞</button>
         </div>
 
         <div id="chat-panel">
-            <div style="padding:15px; border-bottom:1px solid var(--glass-thick); display:flex; justify-content:space-between;">
-                <b>Secure Chat</b>
-                <button onclick="toggleChat()" style="background:none; border:none; color:white; cursor:pointer;">✕</button>
+            <div style="padding:10px; border-bottom:1px solid var(--glass); display:flex; justify-content:space-between">
+                <b>P2P Chat</b>
+                <button onclick="toggleChat()" style="background:none; border:none; color:white">✕</button>
             </div>
-            <div id="chat-body"></div>
-            <div style="padding:15px; display:flex; gap:8px;">
-                <input type="text" id="chatMsg" placeholder="Message..." style="flex:1; background:var(--glass); border:none; color:white; border-radius:10px; padding:10px; outline:none;">
-                <button onclick="sendChat()" style="background:var(--accent); border:none; border-radius:10px; padding:0 15px; cursor:pointer;">➤</button>
+            <div id="chat-body" style="flex:1; padding:10px; overflow-y:auto"></div>
+            <div style="padding:10px; display:flex; gap:5px">
+                <input type="text" id="chatMsg" placeholder="Type..." style="flex:1; border-radius:5px; border:none; padding:8px">
+                <button onclick="sendChat()" style="background:var(--accent); border:none; padding:8px; border-radius:5px">➤</button>
             </div>
         </div>
     </div>
 
     <script>
-        let pc, localStream, dataChannel;
-        const iceServers = [{ urls: "stun:stun.l.google.com:19302" }];
+        let pc, localStream, dataChannel, screenStream, fileChunks = [];
+        const ice = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 
-        function showStep(id) { document.querySelectorAll('.step').forEach(s => s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
-        function copy(id) { const t = document.getElementById(id); t.select(); document.execCommand('copy'); alert("Code Copied!"); }
+        function show(id) { document.querySelectorAll('.step').forEach(s => s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+        function copy(id) { const t = document.getElementById(id); t.select(); document.execCommand('copy'); alert("Copied!"); }
 
-        async function initProcess(role) {
+        async function init(role) {
             localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
             document.getElementById('localVideo').srcObject = localStream;
-            pc = new RTCPeerConnection({ iceServers });
+            pc = new RTCPeerConnection(ice);
             localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
 
-            // Setup Data Channel for Messaging
             if(role === 'host') {
-                dataChannel = pc.createDataChannel("chat");
-                setupDataChannel();
+                dataChannel = pc.createDataChannel("data");
+                setupDataHandlers();
             } else {
-                pc.ondatachannel = (event) => {
-                    dataChannel = event.channel;
-                    setupDataChannel();
-                };
+                pc.ondatachannel = (e) => { dataChannel = e.channel; setupDataHandlers(); };
             }
 
-            pc.onconnectionstatechange = () => {
-                if (pc.connectionState === 'connected') {
-                    document.getElementById('wizard-overlay').style.display = 'none';
-                    document.getElementById('call-ui').style.display = 'block';
-                    monitorQuality();
-                }
-            };
-
-            pc.ontrack = e => { document.getElementById('remoteVideo').srcObject = e.streams[0]; };
+            pc.onconnectionstatechange = () => { if (pc.connectionState === 'connected') { document.getElementById('wizard-box').style.display = 'none'; document.getElementById('meeting-ui').style.display = 'flex'; monitor(); } };
+            pc.ontrack = e => document.getElementById('remoteVideo').srcObject = e.streams[0];
 
             if(role === 'host') {
-                showStep('host-gen');
+                show('h-gen');
                 const offer = await pc.createOffer();
                 await pc.setLocalDescription(offer);
-                pc.onicecandidate = e => { if (!e.candidate) { 
-                    document.getElementById('code1').value = btoa(JSON.stringify(pc.localDescription));
-                    document.getElementById('h-copy').disabled = false;
-                }};
-            } else showStep('guest-input');
+                pc.onicecandidate = e => { if(!e.candidate) { document.getElementById('c1').value = btoa(JSON.stringify(pc.localDescription)); document.getElementById('h-copy').disabled = false; } };
+            } else show('g-in');
         }
 
-        async function generateAnswer() {
-            const offer = JSON.parse(atob(document.getElementById('code1-input').value));
+        async function genAnswer() {
+            const offer = JSON.parse(atob(document.getElementById('c1-in').value));
             await pc.setRemoteDescription(new RTCSessionDescription(offer));
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
-            showStep('guest-gen');
-            pc.onicecandidate = e => { if (!e.candidate) {
-                document.getElementById('code2').value = btoa(JSON.stringify(pc.localDescription));
-                document.getElementById('g-copy').disabled = false;
-            }};
+            show('g-gen');
+            pc.onicecandidate = e => { if(!e.candidate) { document.getElementById('c2').value = btoa(JSON.stringify(pc.localDescription)); document.getElementById('g-copy').disabled = false; } };
         }
 
         async function finalizeHost() {
-            const answer = JSON.parse(atob(document.getElementById('code2-input').value));
+            const answer = JSON.parse(atob(document.getElementById('c2-in').value));
             await pc.setRemoteDescription(new RTCSessionDescription(answer));
         }
 
-        // Messaging Logic
-        function setupDataChannel() {
-            dataChannel.onmessage = (e) => appendMessage(e.data, 'received');
+        // P2P Data & File Transfer
+        function setupDataHandlers() {
+            dataChannel.binaryType = 'arraybuffer';
+            dataChannel.onmessage = e => {
+                if (typeof e.data === 'string') {
+                    const msg = JSON.parse(e.data);
+                    if (msg.type === 'chat') appendMsg(msg.val, 'received');
+                    if (msg.type === 'file-meta') { fileMeta = msg; fileChunks = []; document.getElementById('progress-bar').style.display = 'block'; }
+                } else {
+                    fileChunks.push(e.data);
+                    const progress = (fileChunks.length * 16384 / fileMeta.size) * 100;
+                    document.getElementById('progress-bar').style.width = progress + '%';
+                    if (progress >= 100) {
+                        const blob = new Blob(fileChunks);
+                        const url = URL.createObjectURL(blob);
+                        appendMsg(`<a href="${url}" download="${fileMeta.name}" style="color:var(--accent)">Download ${fileMeta.name}</a>`, 'received');
+                        document.getElementById('progress-bar').style.display = 'none';
+                    }
+                }
+            };
+        }
+
+        async function sendFile() {
+            const file = document.getElementById('fileIn').files[0];
+            dataChannel.send(JSON.stringify({ type: 'file-meta', name: file.name, size: file.size }));
+            const buffer = await file.arrayBuffer();
+            const chunkSize = 16384;
+            for (let i = 0; i < buffer.byteLength; i += chunkSize) {
+                dataChannel.send(buffer.slice(i, i + chunkSize));
+            }
+            appendMsg("File sent: " + file.name, 'sent');
         }
 
         function sendChat() {
-            const input = document.getElementById('chatMsg');
-            if(input.value && dataChannel.readyState === "open") {
-                dataChannel.send(input.value);
-                appendMessage(input.value, 'sent');
-                input.value = '';
-            }
+            const val = document.getElementById('chatMsg').value;
+            dataChannel.send(JSON.stringify({type:'chat', val}));
+            appendMsg(val, 'sent');
+            document.getElementById('chatMsg').value = '';
         }
 
-        function appendMessage(msg, type) {
-            const body = document.getElementById('chat-body');
-            body.innerHTML += `<div class="msg ${type}">${msg}</div>`;
-            body.scrollTop = body.scrollHeight;
+        function appendMsg(val, type) {
+            const b = document.getElementById('chat-body');
+            b.innerHTML += `<div style="background:${type==='sent'?'var(--accent)':'var(--glass)'}; color:${type==='sent'?'#000':'#fff'}; padding:8px; border-radius:10px; margin-bottom:5px; align-self:${type==='sent'?'flex-end':'flex-start'}">${val}</div>`;
+            b.scrollTop = b.scrollHeight;
         }
 
-        // Connection Quality Logic
-        async function monitorQuality() {
+        async function monitor() {
             setInterval(async () => {
                 const stats = await pc.getStats();
-                stats.forEach(report => {
-                    if (report.type === 'candidate-pair' && report.state === 'succeeded') {
-                        const rtt = report.currentRoundTripTime * 1000;
-                        const qual = document.getElementById('quality');
-                        if(rtt < 100) qual.innerText = "Excellent";
-                        else if(rtt < 300) qual.innerText = "Good";
-                        else qual.innerText = "Poor";
-                    }
-                });
-            }, 3000);
+                stats.forEach(r => { if(r.type==='candidate-pair' && r.state==='succeeded') document.getElementById('strength').innerText = "Strength: " + (r.currentRoundTripTime * 1000).toFixed(0) + "ms"; });
+            }, 2000);
         }
 
-        function toggleMic() { const t = localStream.getAudioTracks()[0]; t.enabled = !t.enabled; document.getElementById('mBtn').classList.toggle('off', !t.enabled); }
-        function toggleCam() { const t = localStream.getVideoTracks()[0]; t.enabled = !t.enabled; document.getElementById('vBtn').classList.toggle('off', !t.enabled); }
-        function toggleChat() { const p = document.getElementById('chat-panel'); p.style.display = (p.style.display === 'flex') ? 'none' : 'flex'; }
-        function togglePip() { document.getElementById('remoteVideo').requestPictureInPicture(); }
-        document.getElementById('chatMsg').addEventListener('keypress', e => { if(e.key === 'Enter') sendChat(); });
+        // UI Controls
+        function toggleMic() { const t = localStream.getAudioTracks()[0]; t.enabled = !t.enabled; document.getElementById('m-btn').classList.toggle('off', !t.enabled); }
+        function toggleCam() { const t = localStream.getVideoTracks()[0]; t.enabled = !t.enabled; document.getElementById('v-btn').classList.toggle('off', !t.enabled); }
+        function toggleChat() { const p = document.getElementById('chat-panel'); p.style.display = p.style.display==='flex'?'none':'flex'; }
+        async function togglePip() { await document.getElementById('remoteVideo').requestPictureInPicture(); }
+        async function toggleShare() {
+            if(!screenStream) {
+                screenStream = await navigator.mediaDevices.getDisplayMedia({video: true});
+                const vt = screenStream.getVideoTracks()[0];
+                pc.getSenders().find(s => s.track.kind === 'video').replaceTrack(vt);
+                vt.onended = stopShare;
+                document.getElementById('s-btn').classList.add('off');
+            } else stopShare();
+        }
+        function stopShare() {
+            pc.getSenders().find(s => s.track.kind === 'video').replaceTrack(localStream.getVideoTracks()[0]);
+            if(screenStream) screenStream.getTracks().forEach(t => t.stop());
+            screenStream = null;
+            document.getElementById('s-btn').classList.remove('off');
+        }
 
-        // Draggable Logic (Hardware Accelerated)
+        // Draggable Logic
         const dragItem = document.getElementById("local-container");
         let active = false, currentX, currentY, initialX, initialY, xOffset = 0, yOffset = 0;
         const dragStart = (e) => {
