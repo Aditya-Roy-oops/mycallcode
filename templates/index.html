@@ -172,21 +172,7 @@
                 pc.ondatachannel = (e) => { dataChannel = e.channel; setupData(); };
                 showStep('g-step');
             }
-
-            pc.onconnectionstatechange = () => {
-                const state = pc.connectionState;
-                if(state === 'connected') { 
-                    document.getElementById('wizard-box').style.display='none'; 
-                    document.getElementById('meeting-ui').style.display='flex'; 
-                    startStats(); 
-                }
-                // FAIL-SAFE: If partner leaves, disconnects, or closes tab
-                if(state === 'disconnected' || state === 'failed' || state === 'closed') {
-                    alert("Partner left the call.");
-                    location.reload(); 
-                }
-            };
-
+            pc.onconnectionstatechange = () => { if(pc.connectionState === 'connected') { document.getElementById('wizard-box').style.display='none'; document.getElementById('meeting-ui').style.display='flex'; startStats(); } };
             pc.ontrack = e => document.getElementById('remoteVideo').srcObject = e.streams[0];
         }
 
@@ -211,7 +197,7 @@
                 if(typeof e.data === 'string') {
                     const d = JSON.parse(e.data);
                     if(d.type==='chat') addMsg(d.val, 'received');
-                    if(d.type==='hangup') { location.reload(); } // Triggered by button
+                    if(d.type==='hangup') location.reload();
                     if(d.type==='file-meta') { fileMeta = d; fileChunks = []; }
                 } else {
                     fileChunks.push(e.data);
@@ -226,17 +212,7 @@
         function addMsg(v, t) { const b = document.getElementById('chat-msgs'); b.innerHTML += `<div style="padding:10px; border-radius:12px; max-width:85%; background:${t==='sent'?'var(--accent)':'#30363d'}; color:${t==='sent'?'#000':'#fff'}; align-self:${t==='sent'?'flex-end':'flex-start'}">${v}</div>`; b.scrollTop = b.scrollHeight; }
         async function sendFile() { const f = document.getElementById('fileIn').files[0]; dataChannel.send(JSON.stringify({type:'file-meta', name:f.name, size:f.size})); const b = await f.arrayBuffer(), c = 16384; for(let i=0; i<b.byteLength; i+=c) dataChannel.send(b.slice(i, i+c)); addMsg("File Sent: "+f.name, 'sent'); }
 
-        // ENHANCED HANGUP: Sends signal AND closes connection
-        function hangup() { 
-            if(dataChannel && dataChannel.readyState === 'open') {
-                dataChannel.send(JSON.stringify({type:'hangup'})); 
-            }
-            setTimeout(()=> {
-                if(pc) pc.close();
-                location.reload(); 
-            }, 500); 
-        }
-
+        function hangup() { if(dataChannel) dataChannel.send(JSON.stringify({type:'hangup'})); setTimeout(()=>location.reload(), 300); }
         function toggleMic() { const t = localStream.getAudioTracks()[0]; t.enabled = !t.enabled; document.getElementById('mic-btn').classList.toggle('off', !t.enabled); }
         function toggleCam() { const t = localStream.getVideoTracks()[0]; t.enabled = !t.enabled; document.getElementById('cam-btn').classList.toggle('off', !t.enabled); }
         function toggleChat() { const p = document.getElementById('chat-panel'); p.style.display = p.style.display==='flex'?'none':'flex'; }
