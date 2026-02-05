@@ -129,7 +129,7 @@
         #local-container { 
             position: absolute; 
             width: 140px; aspect-ratio: 9/16; /* Mobile portrait default */
-            bottom: 120px; right: 20px; 
+            bottom: 140px; right: 20px; 
             border-radius: 18px; 
             overflow: hidden; 
             background: #1a1a1a;
@@ -215,7 +215,7 @@
             .control-bar { 
                 width: 92%; 
                 padding: 12px 15px; 
-                bottom: calc(30px + env(safe-area-inset-bottom)); /* Lifts bar above home swipe area */
+                bottom: calc(50px + env(safe-area-inset-bottom)); /* Lifts bar above home swipe area */
                 justify-content: space-between; 
                 gap: 5px; 
             }
@@ -316,8 +316,8 @@
             <button onclick="document.getElementById('fileInput').click()" class="c-btn"><i class="ri-attachment-2"></i></button>
             <input type="file" id="fileInput" style="display:none" onchange="sendFile()">
             <button onclick="toggleScreen()" id="share-btn" class="c-btn"><i class="ri-computer-line"></i></button>
-            <!-- Changed icon to ri-phone-off-fill which is the standard hangup icon -->
-            <button onclick="endCall()" class="c-btn btn-end"><i class="ri-phone-off-fill"></i></button>
+            <!-- Changed icon to ri-phone-fill which is the standard hangup icon -->
+            <button onclick="endCall()" class="c-btn btn-end"><i class="ri-phone-fill"></i></button>
         </div>
 
         <!-- Chat Panel -->
@@ -724,3 +724,4 @@
     </script>
 </body>
 </html>
+
