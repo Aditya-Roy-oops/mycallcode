@@ -276,6 +276,7 @@
         let role = null; // 'host' or 'guest'
         let fileChunks = [], fileMeta = null;
         let isChatOpen = false;
+        let codeGenerated = false; // Flag to prevent double generation
 
         // --- UI UTILS ---
         const $ = id => document.getElementById(id);
@@ -285,6 +286,7 @@
         // --- WIZARD LOGIC ---
         async function startFlow(selectedRole) {
             role = selectedRole;
+            codeGenerated = false; // Reset state
             hide('w-intro');
             show('w-step1');
             
@@ -347,20 +349,32 @@
         }
 
         function waitForIceAndShowCode() {
-            // We wait for ICE gathering to complete to ensure the code works on all networks
-            // In a server-based app we would trickle, but for copy-paste/QR we need the full blob
+            // Check immediately if already complete
             if (pc.iceGatheringState === 'complete') {
                 displayCode();
-            } else {
-                pc.onicecandidate = (event) => {
-                    if (!event.candidate) {
-                        displayCode();
-                    }
-                };
+                return;
             }
+
+            // Wait for candidates
+            pc.onicecandidate = (event) => {
+                if (!event.candidate) {
+                    displayCode();
+                }
+            };
+
+            // SAFETY FALLBACK: If network is slow or blocks STUN, force generation after 2s
+            setTimeout(() => {
+                if (!codeGenerated) {
+                    console.log("ICE gathering timed out, sending best available candidates.");
+                    displayCode();
+                }
+            }, 2000);
         }
 
         function displayCode() {
+            if (codeGenerated) return; // Prevent multiple runs
+            codeGenerated = true;
+
             const code = JSON.stringify(pc.localDescription);
             const compressed = LZString.compressToBase64(code);
             
@@ -368,7 +382,6 @@
             
             // Generate QR
             $('qrcode').innerHTML = "";
-            // We strip protocol to save space, just raw data
             new QRCode($('qrcode'), {
                 text: compressed,
                 width: 180,
@@ -397,14 +410,6 @@
         function goToStep3() {
             hide('w-step2');
             show('w-step3');
-            if (role === 'guest') {
-                // Guest has already generated answer at this point logic-wise? 
-                // No, guest flow is: 
-                // 1. Input Host Code
-                // 2. Generate Answer
-                // 3. Show Answer
-                // My logic above in startFlow was slightly off for guest. Let's fix.
-            }
         }
 
         async function finalizeHandshake() {
@@ -423,9 +428,6 @@
                     hide('w-step3');
                     show('w-step1'); // Show loading
                     generateAnswer(); // This will eventually trigger displayCode -> step2
-                } else {
-                    // Host set remote answer, or guest finalize? 
-                    // Host sets remote answer -> connection establishes -> auto-hide wizard
                 }
             } catch (e) {
                 alert("Invalid Code or Connection Error: " + e.message);
