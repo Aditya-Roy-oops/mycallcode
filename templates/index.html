@@ -208,8 +208,17 @@
         }
 
         @media (max-width: 768px) {
-            #local-container { width: 110px; bottom: 110px; right: 15px; }
-            .control-bar { width: 92%; padding: 10px; bottom: 25px; justify-content: space-between; gap: 5px; }
+            /* Adjusted bottom to be higher up to avoid overlap with raised control bar */
+            #local-container { width: 110px; bottom: 140px; right: 15px; }
+            
+            /* Added padding-bottom with env(safe-area) and increased margin */
+            .control-bar { 
+                width: 92%; 
+                padding: 12px 15px; 
+                bottom: calc(30px + env(safe-area-inset-bottom)); /* Lifts bar above home swipe area */
+                justify-content: space-between; 
+                gap: 5px; 
+            }
             .c-btn { width: 44px; height: 44px; font-size: 18px; }
             #chat-panel { width: calc(100% - 30px); left: 15px; bottom: 100px; height: 50vh; }
             h1 { font-size: 1.8rem; }
@@ -307,7 +316,8 @@
             <button onclick="document.getElementById('fileInput').click()" class="c-btn"><i class="ri-attachment-2"></i></button>
             <input type="file" id="fileInput" style="display:none" onchange="sendFile()">
             <button onclick="toggleScreen()" id="share-btn" class="c-btn"><i class="ri-computer-line"></i></button>
-            <button onclick="endCall()" class="c-btn btn-end"><i class="ri-phone-end-fill"></i></button>
+            <!-- Changed icon to ri-phone-off-fill which is the standard hangup icon -->
+            <button onclick="endCall()" class="c-btn btn-end"><i class="ri-phone-off-fill"></i></button>
         </div>
 
         <!-- Chat Panel -->
