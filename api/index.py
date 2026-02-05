@@ -6,13 +6,13 @@ app = Flask(__name__, template_folder='../templates')
 def index():
     return render_template('index.html')
 
-@app.route('/stealth')
-def secure():
-    return render_template('stealth.html')
+# @app.route('/stealth')
+# def secure():
+#     return render_template('stealth.html')
 
-@app.route('/secure')
-def secure():
-    return render_template('secure.html')
+# @app.route('/secure')
+# def secure():
+#     return render_template('secure.html')
 
 # Add a simple health check or manifest route if needed for PWA
 @app.route('/manifest.json')
@@ -28,4 +28,5 @@ def manifest():
 
 if __name__ == '__main__':
     app.run(debug=True)
+
 
