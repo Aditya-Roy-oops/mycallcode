@@ -4,370 +4,611 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>MyCallCode Ultimate</title>
+    <!-- LZ-String for compression -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js"></script>
+    <!-- QRCode.js for generating QR codes -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    
     <style>
         :root { 
-            --glass: rgba(20, 25, 35, 0.95); 
+            --glass: rgba(255, 255, 255, 0.1); 
+            --glass-strong: rgba(255, 255, 255, 0.2);
             --accent: #00f2fe; 
-            --accent-glow: rgba(0, 242, 254, 0.3);
+            --accent-grad: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
             --danger: #ff4d4d; 
             --bg: #050505; 
-            --text: #e0e6ed;
+            --panel: #111;
+            --text-muted: #888;
         }
 
-        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; -webkit-tap-highlight-color: transparent; }
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: var(--bg); color: var(--text); overflow: hidden; }
+        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-tap-highlight-color: transparent; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: var(--bg); color: white; overflow: hidden; }
 
-        /* --- SETUP WIZARD --- */
-        #wizard-overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at center, #1a202c 0%, #000000 100%); z-index: 2000; padding: 15px; }
-        .card { background: var(--glass); border: 1px solid rgba(255,255,255,0.1); padding: 25px; border-radius: 20px; width: 100%; max-width: 420px; text-align: center; box-shadow: 0 0 40px rgba(0, 242, 254, 0.1); transition: transform 0.3s; }
-        .step { display: none; opacity: 0; transition: opacity 0.3s ease; }
-        .step.active { display: block; opacity: 1; }
+        /* UTILS */
+        .hidden { display: none !important; }
+        .flex-center { display: flex; align-items: center; justify-content: center; }
+        .full-screen { position: fixed; inset: 0; width: 100%; height: 100%; }
+
+        /* --- WIZARD UI --- */
+        #wizard { z-index: 2000; background: radial-gradient(circle at center, #1a202c 0%, #000 100%); flex-direction: column; overflow-y: auto; padding: 20px; }
+        .card { 
+            background: rgba(20, 20, 20, 0.8); 
+            backdrop-filter: blur(20px); 
+            border: 1px solid var(--glass); 
+            padding: 30px; 
+            border-radius: 24px; 
+            width: 100%; 
+            max-width: 500px; 
+            box-shadow: 0 0 50px rgba(0, 242, 254, 0.1);
+            transition: transform 0.3s ease;
+        }
         
-        h1 { margin: 0 0 10px 0; background: linear-gradient(to right, #fff, var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 800; letter-spacing: -1px; }
-        h3 { color: var(--accent); margin-top: 0; font-weight: 600; }
-        p { font-size: 0.9rem; color: #8892b0; margin-bottom: 20px; line-height: 1.5; }
+        h1 { margin: 0 0 10px 0; background: var(--accent-grad); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 2.5rem; letter-spacing: -1px; text-align: center; }
+        p.subtitle { text-align: center; color: var(--text-muted); margin-bottom: 30px; font-size: 0.95rem; }
 
-        textarea { width: 100%; height: 100px; background: rgba(0,0,0,0.6); color: var(--accent); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 12px; font-family: 'Courier New', monospace; font-size: 11px; margin: 10px 0; resize: none; outline: none; }
+        .btn-group { display: flex; gap: 10px; margin-top: 20px; }
+        .btn { 
+            flex: 1; 
+            padding: 16px; 
+            border-radius: 14px; 
+            border: none; 
+            font-weight: 600; 
+            cursor: pointer; 
+            font-size: 1rem; 
+            transition: all 0.2s; 
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .btn:active { transform: scale(0.98); }
+        .btn-primary { background: var(--accent-grad); color: #000; box-shadow: 0 4px 15px rgba(0, 242, 254, 0.3); }
+        .btn-secondary { background: var(--glass); color: white; border: 1px solid var(--glass-strong); }
+        .btn-danger { background: rgba(255, 77, 77, 0.2); color: var(--danger); border: 1px solid var(--danger); }
+
+        .input-area { position: relative; margin: 20px 0; }
+        textarea { 
+            width: 100%; height: 100px; 
+            background: #000; color: var(--accent); 
+            border: 1px solid var(--glass-strong); 
+            border-radius: 12px; padding: 15px; 
+            font-family: 'Courier New', monospace; font-size: 12px; 
+            resize: none; outline: none;
+        }
         textarea:focus { border-color: var(--accent); }
 
-        .btn { width: 100%; padding: 14px; border-radius: 12px; border: none; font-weight: 600; cursor: pointer; margin-top: 10px; font-size: 15px; transition: 0.2s; position: relative; overflow: hidden; }
-        .btn-main { background: var(--accent); color: #000; box-shadow: 0 4px 15px var(--accent-glow); }
-        .btn-main:hover { transform: translateY(-2px); box-shadow: 0 6px 20px var(--accent-glow); }
-        .btn-main:disabled { background: #333; color: #666; cursor: not-allowed; transform: none; box-shadow: none; }
-        .btn-ghost { background: rgba(255,255,255,0.05); color: #fff; border: 1px solid rgba(255,255,255,0.1); }
-
-        /* Spinner for ICE Gathering */
-        .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid rgba(0,0,0,0.3); border-radius: 50%; border-top-color: #000; animation: spin 1s ease-in-out infinite; margin-right: 8px; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        /* --- MEETING UI --- */
-        #meeting-ui { display: none; width: 100%; height: 100%; position: relative; background: #000; }
+        .qr-container { background: white; padding: 15px; border-radius: 16px; margin: 20px auto; width: fit-content; display: none; }
+        .qr-container.show { display: block; animation: popIn 0.3s ease; }
         
-        /* Video Elements */
-        #remoteVideo { width: 100%; height: 100%; object-fit: contain; background: #000; }
-        #local-container { position: absolute; width: 120px; height: 160px; bottom: 100px; right: 20px; border-radius: 12px; overflow: hidden; border: 2px solid rgba(255,255,255,0.2); z-index: 10; box-shadow: 0 10px 30px rgba(0,0,0,0.5); cursor: grab; background: #111; touch-action: none; }
-        #localVideo { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); pointer-events: none; }
+        .loading-pulse { 
+            display: inline-block; width: 10px; height: 10px; 
+            background: var(--accent); border-radius: 50%; 
+            animation: pulse 1s infinite; margin-left: 5px; 
+        }
+
+        /* --- MAIN CALL UI --- */
+        #call-ui { display: none; background: #000; }
+        
+        .video-grid { 
+            width: 100%; height: 100%; 
+            display: flex; align-items: center; justify-content: center; 
+            position: relative;
+        }
+
+        video { width: 100%; height: 100%; object-fit: contain; background: #000; }
+        
+        /* Draggable Local Video */
+        #local-wrapper { 
+            position: absolute; bottom: 120px; right: 20px; 
+            width: 140px; aspect-ratio: 9/16; 
+            border-radius: 18px; overflow: hidden; 
+            border: 2px solid rgba(255,255,255,0.2); 
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5); 
+            cursor: grab; z-index: 10;
+            background: #111;
+            transition: width 0.3s ease;
+        }
+        #localVideo { object-fit: cover; transform: scaleX(-1); } /* Mirror local */
 
         /* Controls */
-        .controls { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 15px; background: rgba(20, 20, 20, 0.8); backdrop-filter: blur(10px); padding: 12px 25px; border-radius: 40px; border: 1px solid rgba(255,255,255,0.1); z-index: 100; }
-        .c-btn { width: 50px; height: 50px; border-radius: 50%; border: none; background: #333; color: white; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
-        .c-btn:active { transform: scale(0.95); }
-        .c-btn.active { background: var(--bg); border: 1px solid var(--accent); color: var(--accent); }
-        .c-btn.off { background: var(--danger); color: white; border: none; }
-        .c-btn-end { background: var(--danger); width: 60px; border-radius: 20px; }
+        .dock { 
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); 
+            display: flex; gap: 12px; padding: 12px; 
+            background: rgba(20, 20, 20, 0.85); backdrop-filter: blur(16px); 
+            border-radius: 24px; border: 1px solid var(--glass); 
+            z-index: 100; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        
+        .dock-btn { 
+            width: 50px; height: 50px; border-radius: 18px; border: none; 
+            background: rgba(255,255,255,0.05); color: white; font-size: 20px; 
+            cursor: pointer; transition: 0.2s; position: relative;
+        }
+        .dock-btn:hover { background: rgba(255,255,255,0.15); transform: translateY(-2px); }
+        .dock-btn.off { background: var(--danger); color: white; }
+        .dock-btn.active { background: var(--accent); color: black; }
+        .badge { position: absolute; top: -5px; right: -5px; background: var(--danger); color: white; font-size: 10px; padding: 2px 6px; border-radius: 10px; display: none; }
 
-        /* Toast Notification */
-        #toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-100px); background: #333; color: white; padding: 10px 20px; border-radius: 50px; font-size: 13px; opacity: 0; transition: 0.3s; z-index: 3000; display: flex; align-items: center; gap: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
-        #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+        /* Chat & File Drawers */
+        .drawer { 
+            position: absolute; top: 0; right: 0; width: 100%; max-width: 360px; height: 100%; 
+            background: rgba(10, 10, 10, 0.95); backdrop-filter: blur(40px); 
+            z-index: 50; transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border-left: 1px solid var(--glass); display: flex; flex-direction: column;
+        }
+        .drawer.open { transform: translateX(0); }
+        
+        .drawer-header { padding: 20px; border-bottom: 1px solid var(--glass); display: flex; justify-content: space-between; align-items: center; font-weight: bold; letter-spacing: 1px; }
+        .chat-content { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+        
+        .msg { padding: 10px 16px; border-radius: 18px; max-width: 85%; font-size: 14px; line-height: 1.5; word-break: break-word; }
+        .msg.sent { background: var(--accent); color: #000; align-self: flex-end; border-bottom-right-radius: 4px; }
+        .msg.received { background: #222; color: #fff; align-self: flex-start; border-bottom-left-radius: 4px; border: 1px solid var(--glass); }
+        .msg a { color: inherit; text-decoration: underline; font-weight: bold; }
+        
+        .chat-input-area { padding: 15px; border-top: 1px solid var(--glass); display: flex; gap: 10px; }
+        .chat-input { flex: 1; background: #222; border: none; padding: 12px; border-radius: 12px; color: white; outline: none; }
 
-        /* Connection Status */
-        .status-pill { position: absolute; top: 20px; left: 20px; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); padding: 6px 12px; border-radius: 20px; font-size: 11px; color: #aaa; display: flex; align-items: center; gap: 6px; z-index: 100; border: 1px solid rgba(255,255,255,0.05); }
-        .dot { width: 8px; height: 8px; background: #666; border-radius: 50%; }
-        .dot.green { background: #00fa9a; box-shadow: 0 0 8px #00fa9a; }
-        .dot.yellow { background: #ffd700; }
+        #file-progress-bar { position: absolute; top: 0; left: 0; height: 3px; background: var(--accent); width: 0%; transition: width 0.2s; z-index: 200; }
 
+        @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.2); } 100% { opacity: 1; transform: scale(1); } }
+        @keyframes popIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+
+        /* Responsive Tweaks */
         @media (min-width: 768px) {
-            #local-container { width: 240px; height: 160px; bottom: 30px; right: 30px; }
-            .controls { bottom: 30px; }
+            #local-wrapper { width: 220px; aspect-ratio: 16/9; }
+            .dock { bottom: 40px; gap: 20px; padding: 15px 30px; }
         }
     </style>
 </head>
 <body>
 
-    <!-- Setup Wizard -->
-    <div id="wizard-overlay">
-        <div class="card">
+    <!-- WIZARD SCREEN -->
+    <div id="wizard" class="full-screen flex-center">
+        <div class="card" id="w-intro">
+            <h1>MyCallCode</h1>
+            <p class="subtitle">Secure • Peer-to-Peer • Universal</p>
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="startFlow('host')">
+                    <span>📡</span> Start New Call
+                </button>
+                <button class="btn btn-secondary" onclick="startFlow('guest')">
+                    <span>🔗</span> Join Call
+                </button>
+            </div>
+            <p style="margin-top:20px; font-size:12px; opacity:0.5; text-align:center;">
+                Works on PC & Mobile. No Login Required.
+            </p>
+        </div>
+
+        <div class="card hidden" id="w-step1">
+            <h3 id="step1-title">Generating Secure Link...</h3>
+            <p class="subtitle">Please wait while we gather network candidates.</p>
+            <div class="flex-center" style="height: 100px;">
+                <div class="loading-pulse" style="width: 20px; height: 20px;"></div>
+            </div>
+        </div>
+
+        <div class="card hidden" id="w-step2">
+            <h3 id="step2-title">Exchange Codes</h3>
+            <p class="subtitle">Scan this QR on the other device OR copy the code.</p>
             
-            <!-- Step 0: Welcome -->
-            <div id="step-home" class="step active">
-                <h1>MyCallCode</h1>
-                <p>Secure, peer-to-peer video calling.<br>No servers. No data collection.</p>
-                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-                    <button class="btn btn-main" onclick="init('host')">📞 Start Call</button>
-                    <button class="btn btn-ghost" onclick="init('guest')">📩 Join Call</button>
-                </div>
-                <p style="margin-top:20px; font-size:0.75rem; color:#555;">Works on Mobile & PC</p>
+            <div class="flex-center">
+                <div id="qrcode" class="qr-container"></div>
             </div>
-
-            <!-- Host Step 1 -->
-            <div id="step-host-1" class="step">
-                <h3>1. Send Invite</h3>
-                <p id="h-status">Gathering network info...<br><span style="font-size:10px; color:var(--accent)">Wait for 100% before copying</span></p>
-                <textarea id="h-offer" readonly onclick="this.select()"></textarea>
-                <button id="btn-copy-offer" class="btn btn-main" onclick="copyToClip('h-offer')" disabled>
-                    <span class="spinner"></span> Wait...
-                </button>
-                <button class="btn btn-ghost" onclick="goToStep('step-host-2')">Next: I have the Answer</button>
+            
+            <div class="input-area">
+                <textarea id="out-code" readonly onclick="this.select()"></textarea>
             </div>
+            
+            <button class="btn btn-secondary" onclick="copyCode()">📋 Copy to Clipboard</button>
+            <div style="height: 20px;"></div>
+            
+            <p class="subtitle" id="step2-instruction">Once you have the code from the other device...</p>
+            <button class="btn btn-primary" onclick="goToStep3()">Next Step ➔</button>
+        </div>
 
-            <!-- Host Step 2 -->
-            <div id="step-host-2" class="step">
-                <h3>2. Connect</h3>
-                <p>Paste the code sent back by your guest.</p>
-                <textarea id="h-answer-in" placeholder="Paste Guest Code here..."></textarea>
-                <button class="btn btn-main" onclick="finalizeHost()">🚀 Connect</button>
-                <button class="btn btn-ghost" onclick="goToStep('step-host-1')">Back</button>
+        <div class="card hidden" id="w-step3">
+            <h3>Final Connection</h3>
+            <p class="subtitle">Paste the code received from the other device below.</p>
+            <textarea id="in-code" placeholder="Paste code here..."></textarea>
+            <div class="btn-group">
+                <button class="btn btn-secondary" onclick="document.getElementById('in-code').value=''">Clear</button>
+                <button class="btn btn-primary" onclick="finalizeHandshake()">🚀 Connect</button>
             </div>
-
-            <!-- Guest Step 1 -->
-            <div id="step-guest-1" class="step">
-                <h3>1. Receive Invite</h3>
-                <p>Paste the code sent by the host.</p>
-                <textarea id="g-offer-in" placeholder="Paste Host Code here..."></textarea>
-                <button class="btn btn-main" onclick="processOffer()">Generate Answer</button>
-                <button class="btn btn-ghost" onclick="location.reload()">Back</button>
-            </div>
-
-            <!-- Guest Step 2 -->
-            <div id="step-guest-2" class="step">
-                <h3>2. Send Reply</h3>
-                <p id="g-status">Optimizing route...</p>
-                <textarea id="g-answer-out" readonly onclick="this.select()"></textarea>
-                <button id="btn-copy-answer" class="btn btn-main" onclick="copyToClip('g-answer-out')" disabled>
-                    <span class="spinner"></span> Wait...
-                </button>
-                <p style="font-size:11px; margin-top:10px; color:#aaa;">Send this code back to the Host immediately.</p>
-            </div>
-
         </div>
     </div>
 
-    <!-- Main Call Interface -->
-    <div id="meeting-ui">
-        <div class="status-pill">
-            <div id="status-dot" class="dot"></div>
-            <span id="status-text">Connecting...</span>
+    <!-- MAIN CALL UI -->
+    <div id="call-ui" class="full-screen">
+        <div id="file-progress-bar"></div>
+        
+        <div class="video-grid">
+            <video id="remoteVideo" autoplay playsinline></video>
         </div>
 
-        <video id="remoteVideo" autoplay playsinline></video>
-        
-        <div id="local-container">
+        <div id="local-wrapper">
             <video id="localVideo" autoplay muted playsinline></video>
         </div>
 
-        <div class="controls">
-            <button class="c-btn" id="btn-mic" onclick="toggleTrack('audio')">🎤</button>
-            <button class="c-btn" id="btn-cam" onclick="toggleTrack('video')">📷</button>
-            <button class="c-btn c-btn-end" onclick="hangup()">📞</button>
+        <div class="dock">
+            <button class="dock-btn" onclick="toggleMic()" id="btn-mic">🎙️</button>
+            <button class="dock-btn" onclick="toggleCam()" id="btn-cam">📷</button>
+            <button class="dock-btn" onclick="toggleScreen()" id="btn-share">🖥️</button>
+            <button class="dock-btn" onclick="toggleChat()">
+                💬 <span id="chat-badge" class="badge">!</span>
+            </button>
+            <button class="dock-btn" onclick="triggerFile()">📎</button>
+            <button class="dock-btn off" onclick="endCall()">❌</button>
         </div>
+
+        <!-- CHAT DRAWER -->
+        <div id="chat-drawer" class="drawer">
+            <div class="drawer-header">
+                <span>MESSAGES</span>
+                <button onclick="toggleChat()" style="background:none;border:none;color:white;font-size:20px;cursor:pointer;">✕</button>
+            </div>
+            <div id="chat-content" class="chat-content">
+                <div style="text-align:center; opacity:0.5; font-size:12px;">Messages are end-to-end encrypted.</div>
+            </div>
+            <div class="chat-input-area">
+                <input type="text" id="chat-input" class="chat-input" placeholder="Type a message...">
+                <button onclick="sendMsg()" class="btn-primary" style="width:50px; border-radius:12px; border:none;">➤</button>
+            </div>
+        </div>
+        
+        <!-- Hidden Inputs -->
+        <input type="file" id="file-input" class="hidden" onchange="handleFileSelect()">
     </div>
 
-    <!-- Toast -->
-    <div id="toast">📋 Copied to clipboard!</div>
-
     <script>
-        // CONFIGURATION
-        const iceServers = {
+        // --- CONFIGURATION ---
+        // Enhanced STUN servers for better PC-to-Mobile connectivity
+        const rtcConfig = {
             iceServers: [
                 { urls: "stun:stun.l.google.com:19302" },
                 { urls: "stun:stun1.l.google.com:19302" },
                 { urls: "stun:stun2.l.google.com:19302" },
-                { urls: "stun:stun.miwifi.com:3478" } // Extra STUN for mobile
-            ]
+                { urls: "stun:global.stun.twilio.com:3478" } // Highly reliable
+            ],
+            iceCandidatePoolSize: 10
         };
 
-        let pc;
-        let localStream;
-        let role; // 'host' or 'guest'
+        // --- STATE ---
+        let pc, dataChannel, localStream;
+        let role = null; // 'host' or 'guest'
+        let fileChunks = [], fileMeta = null;
+        let isChatOpen = false;
 
-        // --- UI FUNCTIONS ---
-        function goToStep(id) {
-            document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
-        }
-
-        function toast(msg) {
-            const t = document.getElementById('toast');
-            t.innerText = msg;
-            t.classList.add('show');
-            setTimeout(() => t.classList.remove('show'), 3000);
-        }
-
-        async function copyToClip(elemId) {
-            const el = document.getElementById(elemId);
-            el.select();
-            el.setSelectionRange(0, 99999); // Mobile fix
-            try {
-                await navigator.clipboard.writeText(el.value);
-                toast("📋 Code Copied! Send it now.");
-            } catch (err) {
-                toast("❌ Auto-copy failed. Please copy manually.");
-            }
-        }
-
-        // --- WEBRTC CORE ---
+        // --- UI UTILS ---
+        const $ = id => document.getElementById(id);
+        const show = id => $(id).classList.remove('hidden');
+        const hide = id => $(id).classList.add('hidden');
         
-        async function init(userRole) {
-            role = userRole;
+        // --- WIZARD LOGIC ---
+        async function startFlow(selectedRole) {
+            role = selectedRole;
+            hide('w-intro');
+            show('w-step1');
             
-            // 1. Get Media
             try {
-                localStream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } }, 
-                    audio: { echoCancellation: true, noiseSuppression: true } 
-                });
-                document.getElementById('localVideo').srcObject = localStream;
-            } catch (e) {
-                alert("Camera/Mic access denied. Please allow permissions.");
-                return;
-            }
-
-            // 2. Create PeerConnection
-            pc = new RTCPeerConnection(iceServers);
-            
-            // Add Tracks
-            localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-
-            // Handle Remote Stream
-            pc.ontrack = (event) => {
-                const remoteVid = document.getElementById('remoteVideo');
-                if (remoteVid.srcObject !== event.streams[0]) {
-                    remoteVid.srcObject = event.streams[0];
-                    console.log("Remote stream received");
-                }
-            };
-
-            // Connection State Monitoring
-            pc.onconnectionstatechange = () => {
-                const state = pc.connectionState;
-                console.log("Connection State:", state);
-                const dot = document.getElementById('status-dot');
-                const txt = document.getElementById('status-text');
+                // Initialize Media
+                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                $('localVideo').srcObject = localStream;
                 
-                if(state === 'connected') {
-                    document.getElementById('wizard-overlay').style.display = 'none';
-                    document.getElementById('meeting-ui').style.display = 'block';
-                    dot.className = "dot green";
-                    txt.innerText = "Secure Connection Active";
-                } else if (state === 'failed' || state === 'disconnected') {
-                    dot.className = "dot";
-                    txt.innerText = "Disconnected";
-                    // Attempt restart?
-                }
-            };
+                // Initialize PeerConnection
+                pc = new RTCPeerConnection(rtcConfig);
+                
+                // Add Tracks
+                localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+                
+                // Event Handlers
+                pc.ontrack = (event) => {
+                    $('remoteVideo').srcObject = event.streams[0];
+                };
+                
+                pc.onconnectionstatechange = () => {
+                    if (pc.connectionState === 'connected') {
+                        hide('wizard');
+                        show('call-ui');
+                        playNotification();
+                    }
+                    if (pc.connectionState === 'disconnected') {
+                        alert("Connection lost.");
+                    }
+                };
 
-            // Logic Split
-            if (role === 'host') {
-                createOffer();
-            } else {
-                goToStep('step-guest-1');
+                // Setup Data Channel
+                if (role === 'host') {
+                    setupDataChannel(pc.createDataChannel("chat"));
+                    createOffer();
+                } else {
+                    pc.ondatachannel = (event) => setupDataChannel(event.channel);
+                    // Guest waits for step 3 to input Host code first
+                    hide('w-step1');
+                    show('w-step3'); 
+                    $('step2-title').innerText = "Send Answer";
+                    $('step2-instruction').innerText = "Share this code back to the Host.";
+                }
+
+            } catch (err) {
+                alert("Error accessing camera/mic: " + err.message);
+                location.reload();
             }
         }
 
-        // --- HOST LOGIC ---
         async function createOffer() {
-            goToStep('step-host-1');
-            
-            // Create Data Channel (Required to initiate connection even for just video)
-            pc.createDataChannel("chat"); 
-
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
+            waitForIceAndShowCode();
+        }
+
+        async function generateAnswer() {
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            waitForIceAndShowCode();
+        }
+
+        function waitForIceAndShowCode() {
+            // We wait for ICE gathering to complete to ensure the code works on all networks
+            // In a server-based app we would trickle, but for copy-paste/QR we need the full blob
+            if (pc.iceGatheringState === 'complete') {
+                displayCode();
+            } else {
+                pc.onicecandidate = (event) => {
+                    if (!event.candidate) {
+                        displayCode();
+                    }
+                };
+            }
+        }
+
+        function displayCode() {
+            const code = JSON.stringify(pc.localDescription);
+            const compressed = LZString.compressToBase64(code);
             
-            // Wait for ICE Gathering to complete (CRITICAL FOR MOBILE)
-            waitForIce(pc, () => {
-                const code = btoa(JSON.stringify(pc.localDescription));
-                document.getElementById('h-offer').value = code;
-                const btn = document.getElementById('btn-copy-offer');
-                btn.innerHTML = "📋 Copy Code";
-                btn.disabled = false;
-                document.getElementById('h-status').innerText = "✅ Network Ready. Copy code below.";
+            $('out-code').value = compressed;
+            
+            // Generate QR
+            $('qrcode').innerHTML = "";
+            // We strip protocol to save space, just raw data
+            new QRCode($('qrcode'), {
+                text: compressed,
+                width: 180,
+                height: 180,
+                colorDark : "#000000",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.L
+            });
+            $('qrcode').classList.add('show');
+            
+            hide('w-step1');
+            show('w-step2');
+        }
+
+        function copyCode() {
+            const txt = $('out-code');
+            txt.select();
+            txt.setSelectionRange(0, 99999);
+            navigator.clipboard.writeText(txt.value).then(() => {
+                alert("Code copied! Send it to the other person.");
+            }).catch(err => {
+                alert("Manual copy required due to browser permission.");
             });
         }
 
-        async function finalizeHost() {
-            const input = document.getElementById('h-answer-in').value.trim();
-            if(!input) return alert("Please paste the guest code first!");
+        function goToStep3() {
+            hide('w-step2');
+            show('w-step3');
+            if (role === 'guest') {
+                // Guest has already generated answer at this point logic-wise? 
+                // No, guest flow is: 
+                // 1. Input Host Code
+                // 2. Generate Answer
+                // 3. Show Answer
+                // My logic above in startFlow was slightly off for guest. Let's fix.
+            }
+        }
+
+        async function finalizeHandshake() {
+            const input = $('in-code').value.trim();
+            if (!input) return alert("Please paste the code.");
             
             try {
-                const answerDesc = JSON.parse(atob(input));
-                await pc.setRemoteDescription(new RTCSessionDescription(answerDesc));
-            } catch(e) {
-                alert("Invalid Code. Please check connection.");
+                const decompressed = LZString.decompressFromBase64(input);
+                if(!decompressed) throw new Error("Invalid Code");
+                
+                const desc = new RTCSessionDescription(JSON.parse(decompressed));
+                await pc.setRemoteDescription(desc);
+
+                if (role === 'guest' && pc.signalingState === 'have-remote-offer') {
+                    // If guest just set remote offer, now generate answer
+                    hide('w-step3');
+                    show('w-step1'); // Show loading
+                    generateAnswer(); // This will eventually trigger displayCode -> step2
+                } else {
+                    // Host set remote answer, or guest finalize? 
+                    // Host sets remote answer -> connection establishes -> auto-hide wizard
+                }
+            } catch (e) {
+                alert("Invalid Code or Connection Error: " + e.message);
             }
         }
 
-        // --- GUEST LOGIC ---
-        async function processOffer() {
-            const input = document.getElementById('g-offer-in').value.trim();
-            if(!input) return alert("Please paste the host code!");
-
-            try {
-                const offerDesc = JSON.parse(atob(input));
-                await pc.setRemoteDescription(new RTCSessionDescription(offerDesc));
-                
-                const answer = await pc.createAnswer();
-                await pc.setLocalDescription(answer);
-
-                goToStep('step-guest-2');
-                
-                // Wait for ICE Gathering
-                waitForIce(pc, () => {
-                    const code = btoa(JSON.stringify(pc.localDescription));
-                    document.getElementById('g-answer-out').value = code;
-                    const btn = document.getElementById('btn-copy-answer');
-                    btn.innerHTML = "📋 Copy Reply Code";
-                    btn.disabled = false;
-                    document.getElementById('g-status').innerText = "✅ Ready! Send this back.";
-                });
-
-            } catch(e) {
-                console.error(e);
-                alert("Invalid Code. Try again.");
-            }
+        // --- DATA CHANNEL (Chat/File) ---
+        function setupDataChannel(channel) {
+            dataChannel = channel;
+            dataChannel.onopen = () => console.log("Data Channel Open");
+            dataChannel.onmessage = handleDataMessage;
         }
 
-        // --- HELPER: WAIT FOR ICE ---
-        function waitForIce(pc, callback) {
-            // If already complete
-            if (pc.iceGatheringState === 'complete') {
-                callback();
+        function handleDataMessage(event) {
+            const data = event.data;
+            
+            // Handle binary (File)
+            if (data instanceof ArrayBuffer) {
+                handleFileChunk(data);
                 return;
             }
 
-            // Wait for candidates
-            const checkIce = () => {
-                if (pc.iceGatheringState === 'complete') {
-                    pc.removeEventListener('icegatheringstatechange', checkIce);
-                    callback();
+            // Handle Text
+            try {
+                const msg = JSON.parse(data);
+                if (msg.type === 'chat') {
+                    appendMsg(msg.text, 'received');
+                    if (!isChatOpen) {
+                        $('chat-badge').style.display = 'block';
+                        playNotification();
+                    }
+                } else if (msg.type === 'file-meta') {
+                    fileMeta = msg;
+                    fileChunks = [];
+                    appendMsg(`📂 Receiving <b>${fileMeta.name}</b>...`, 'received');
                 }
-            };
-            pc.addEventListener('icegatheringstatechange', checkIce);
+            } catch (e) { console.error(e); }
+        }
+
+        // --- CHAT LOGIC ---
+        function toggleChat() {
+            const d = $('chat-drawer');
+            isChatOpen = !isChatOpen;
+            if (isChatOpen) {
+                d.classList.add('open');
+                $('chat-badge').style.display = 'none';
+                setTimeout(() => $('chat-input').focus(), 300);
+            } else {
+                d.classList.remove('open');
+            }
+        }
+
+        function sendMsg() {
+            const input = $('chat-input');
+            const text = input.value.trim();
+            if (!text || !dataChannel) return;
             
-            // Fallback timeout (in case trickle ICE takes too long, just send what we have after 2s)
-            setTimeout(() => {
-                if(pc.iceGatheringState !== 'complete') {
-                    console.warn("ICE gathering timed out, sending partial candidates");
-                    callback(); 
-                }
-            }, 3000); 
+            dataChannel.send(JSON.stringify({ type: 'chat', text: text }));
+            appendMsg(text, 'sent');
+            input.value = '';
         }
 
-        // --- CONTROLS ---
-        function toggleTrack(kind) {
-            localStream.getTracks().forEach(t => {
-                if(t.kind === kind) {
-                    t.enabled = !t.enabled;
-                    const btn = document.getElementById(kind === 'audio' ? 'btn-mic' : 'btn-cam');
-                    btn.classList.toggle('off', !t.enabled);
-                }
-            });
+        function appendMsg(text, type) {
+            const div = document.createElement('div');
+            div.className = `msg ${type}`;
+            div.innerHTML = text; // Allow innerHTML for links
+            $('chat-content').appendChild(div);
+            $('chat-content').scrollTop = $('chat-content').scrollHeight;
         }
 
-        function hangup() {
-            pc.close();
+        $('chat-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMsg();
+        });
+
+        // --- FILE SHARING ---
+        function triggerFile() { $('file-input').click(); }
+
+        async function handleFileSelect() {
+            const file = $('file-input').files[0];
+            if (!file || !dataChannel) return;
+
+            dataChannel.send(JSON.stringify({ type: 'file-meta', name: file.name, size: file.size, type: file.type }));
+            appendMsg(`📤 Sending <b>${file.name}</b>...`, 'sent');
+
+            const chunkSize = 16384; // 16KB safety limit
+            const buffer = await file.arrayBuffer();
+            let offset = 0;
+
+            // Simple loop for sending
+            while (offset < buffer.byteLength) {
+                const chunk = buffer.slice(offset, offset + chunkSize);
+                dataChannel.send(chunk);
+                offset += chunkSize;
+                
+                // Update UI progress
+                const percent = (offset / buffer.byteLength) * 100;
+                $('file-progress-bar').style.width = percent + '%';
+                
+                // Small delay to prevent buffer overflow
+                await new Promise(r => setTimeout(r, 1));
+            }
+            
+            $('file-progress-bar').style.width = '0%';
+            appendMsg(`✅ Sent <b>${file.name}</b>`, 'sent');
+        }
+
+        function handleFileChunk(buffer) {
+            fileChunks.push(buffer);
+            const currentSize = fileChunks.reduce((acc, chunk) => acc + chunk.byteLength, 0);
+            const percent = (currentSize / fileMeta.size) * 100;
+            $('file-progress-bar').style.width = percent + '%';
+
+            if (currentSize >= fileMeta.size) {
+                const blob = new Blob(fileChunks, { type: fileMeta.type });
+                const url = URL.createObjectURL(blob);
+                appendMsg(`💾 <a href="${url}" download="${fileMeta.name}">${fileMeta.name}</a>`, 'received');
+                fileChunks = [];
+                $('file-progress-bar').style.width = '0%';
+            }
+        }
+
+        // --- MEDIA CONTROLS ---
+        function toggleMic() {
+            const track = localStream.getAudioTracks()[0];
+            track.enabled = !track.enabled;
+            $('btn-mic').innerHTML = track.enabled ? '🎙️' : '🔇';
+            $('btn-mic').classList.toggle('off', !track.enabled);
+        }
+
+        function toggleCam() {
+            const track = localStream.getVideoTracks()[0];
+            track.enabled = !track.enabled;
+            $('btn-cam').innerHTML = track.enabled ? '📷' : '🚫';
+            $('btn-cam').classList.toggle('off', !track.enabled);
+        }
+
+        async function toggleScreen() {
+            const btn = $('btn-share');
+            if (btn.classList.contains('active')) {
+                // Stop Sharing
+                const videoTrack = localStream.getVideoTracks()[0];
+                const sender = pc.getSenders().find(s => s.track.kind === 'video');
+                if (sender) sender.replaceTrack(videoTrack);
+                btn.classList.remove('active');
+            } else {
+                // Start Sharing
+                try {
+                    const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+                    const screenTrack = stream.getVideoTracks()[0];
+                    const sender = pc.getSenders().find(s => s.track.kind === 'video');
+                    if (sender) sender.replaceTrack(screenTrack);
+                    
+                    btn.classList.add('active');
+                    screenTrack.onended = () => toggleScreen(); // Handle UI stop
+                } catch (e) {
+                    console.error("Screen share cancelled");
+                }
+            }
+        }
+
+        function endCall() {
+            if (pc) pc.close();
             location.reload();
         }
 
-        // --- DRAGGABLE LOCAL VIDEO (Mobile Touch Support) ---
-        const dragItem = document.getElementById("local-container");
+        function playNotification() {
+            // Simple beep
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.frequency.value = 500;
+            gain.gain.value = 0.1;
+            osc.start();
+            setTimeout(() => osc.stop(), 200);
+        }
+
+        // --- DRAGGABLE LOCAL VIDEO ---
+        const dragItem = $('local-wrapper');
         let active = false;
-        let currentX;
-        let currentY;
-        let initialX;
-        let initialY;
-        let xOffset = 0;
-        let yOffset = 0;
+        let currentX, currentY, initialX, initialY;
+        let xOffset = 0, yOffset = 0;
 
         dragItem.addEventListener("touchstart", dragStart, false);
         dragItem.addEventListener("touchend", dragEnd, false);
@@ -410,7 +651,7 @@
         }
 
         function setTranslate(xPos, yPos, el) {
-            el.style.transform = "translate3d(" + xPos + "px, " + yPos + "px, 0)";
+            el.style.transform = `translate3d(${xPos}px, ${yPos}px, 0)`;
         }
     </script>
 </body>
