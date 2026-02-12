@@ -8,7 +8,7 @@
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
     <style>
         :root { 
-            --glass: rgba(22, 27, 34, 0.9); 
+            --glass: rgba(22, 27, 34, 0.95); 
             --glass-border: rgba(255, 255, 255, 0.15);
             --accent: #00f2fe; 
             --accent-grad: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
@@ -161,6 +161,7 @@
             display: flex; align-items: center; gap: 8px;
         }
         #toast.show { transform: translateX(-50%) translateY(0); }
+        #toast.error { background: var(--danger); }
 
         @media (min-width: 769px) {
             #local-container { width: 220px; aspect-ratio: 16/9; }
@@ -198,7 +199,7 @@
                 <h3>Creating Secure Room...</h3>
                 <p>Gathering network candidates...</p>
                 <div class="loader-ring"></div>
-                <div style="margin-top:10px; font-size:11px; color:#666">Please wait a moment</div>
+                <div style="margin-top:10px; font-size:11px; color:#666">Please wait...</div>
             </div>
             <div id="step-host-2" class="step">
                 <h3>1. Share Code</h3>
@@ -280,8 +281,6 @@
     </div>
 
     <script>
-        // --- HIGH AVAILABILITY CONFIG ---
-        // Using explicit STUN servers
         const rtcConfig = {
             iceServers: [
                 { urls: "stun:stun.l.google.com:19302" },
@@ -297,15 +296,17 @@
         let fileChunks = [], fileMeta = null;
         let iceGatheringTimeout = null;
         let isCodeGenerated = false;
+        let connectionFinalized = false;
 
         function goToStep(id) {
             document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
             document.getElementById(id).classList.add('active');
         }
 
-        function showToast(msg) {
+        function showToast(msg, isError=false) {
             const t = document.getElementById('toast');
             document.getElementById('toast-msg').innerText = msg;
+            if(isError) t.classList.add('error'); else t.classList.remove('error');
             t.classList.add('show');
             setTimeout(() => t.classList.remove('show'), 3000);
         }
@@ -325,6 +326,13 @@
 
         async function initCall(role) {
             try {
+                if(localStream) {
+                    localStream.getTracks().forEach(t => t.stop());
+                }
+                if(pc) {
+                    pc.close();
+                }
+                
                 localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 document.getElementById('localVideo').srcObject = localStream;
                 setupPeerConnection(role);
@@ -336,11 +344,10 @@
         function setupPeerConnection(role) {
             pc = new RTCPeerConnection(rtcConfig);
             isCodeGenerated = false;
+            connectionFinalized = false;
             
-            // Add local tracks
             localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
 
-            // Important: Handle remote stream
             pc.ontrack = e => {
                 const vid = document.getElementById('remoteVideo');
                 if (vid.srcObject !== e.streams[0]) {
@@ -350,42 +357,37 @@
             };
 
             pc.onconnectionstatechange = () => {
-                console.log("State:", pc.connectionState);
                 if (pc.connectionState === 'connected') {
                     document.getElementById('wizard-box').style.display = 'none';
                     document.getElementById('meeting-ui').style.display = 'flex';
                     startPingStats();
                 } else if(pc.connectionState === 'failed') {
-                    showToast("Connection failed. Try switching networks.");
+                    showToast("Connection failed. Try switching networks.", true);
                 }
             };
 
-            // Smart ICE Gathering with Failsafe
             pc.onicecandidate = (e) => {
                 if (e.candidate) {
-                    // We found a path. Wait up to 1s for more better paths.
                     if (iceGatheringTimeout) clearTimeout(iceGatheringTimeout);
-                    iceGatheringTimeout = setTimeout(() => finalizeCode(role), 1000);
+                    // 2s timeout for mobile networks to gather all candidates
+                    iceGatheringTimeout = setTimeout(() => finalizeCode(role), 2000); 
                 } else {
-                    // All candidates gathered
                     finalizeCode(role);
                 }
             };
 
-            // Failsafe: If ICE gathering is too slow (e.g. strict firewall), force generation after 2s
+            // Failsafe timeout 5s
             setTimeout(() => {
                 if(!isCodeGenerated) {
                     console.log("Forcing code generation due to timeout");
                     finalizeCode(role);
                 }
-            }, 3000);
+            }, 5000);
 
             if (role === 'host') {
                 goToStep('step-host-1');
                 dataChannel = pc.createDataChannel("chat");
                 setupDataChannel(dataChannel);
-                
-                // Explicitly ask for audio/video receive to ensure mobile knows what to do
                 pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true })
                   .then(d => pc.setLocalDescription(d));
             } else {
@@ -415,39 +417,54 @@
 
         async function processGuestOffer() {
             let val = document.getElementById('guest-code-in').value.trim();
-            if(!val) return showToast("Paste host code first!");
+            if(!val) return showToast("Paste host code first!", true);
             
             try {
-                goToStep('step-guest-loading');
-                // Basic validation
-                if(!val.startsWith('ey')) throw new Error("Invalid format"); // base64 JSON usually starts with 'ey'
-                
+                // Validation
+                if(!val.startsWith('ey')) throw new Error("Format invalid");
                 const offer = JSON.parse(atob(val));
+                
+                if(offer.type !== 'offer') {
+                    alert("Incorrect Code. You pasted an Answer code, but as a Guest you need the HOST's OFFER code.");
+                    return;
+                }
+
+                goToStep('step-guest-loading');
                 await pc.setRemoteDescription(new RTCSessionDescription(offer));
                 const answer = await pc.createAnswer();
                 await pc.setLocalDescription(answer);
             } catch(e) {
-                alert("Invalid or Incomplete Code. Please Ensure you copied the FULL code.");
+                alert("Invalid Code. Please make sure you copied the entire code.");
                 goToStep('step-guest-1');
             }
         }
 
         async function finalizeHost() {
+            if(connectionFinalized) return; 
+
             let val = document.getElementById('host-code-in').value.trim();
-            if(!val) return showToast("Paste answer code first!");
+            if(!val) return showToast("Paste answer code first!", true);
             
             try {
-                if(!val.startsWith('ey')) throw new Error("Invalid format");
+                if(!val.startsWith('ey')) throw new Error("Format invalid");
                 
                 const answer = JSON.parse(atob(val));
+                
+                if(answer.type !== 'answer') {
+                    alert("Wrong Code! You pasted an 'Offer' code. You need to paste the 'Answer' code you received from the Guest.");
+                    return;
+                }
+
                 // Only set remote if we are in the right state
                 if(pc.signalingState === "have-local-offer") {
                     await pc.setRemoteDescription(new RTCSessionDescription(answer));
-                } else {
-                    console.warn("Already connected or wrong state");
+                    connectionFinalized = true;
+                } else if(pc.signalingState === "stable") {
+                    console.log("Already connected");
                 }
             } catch(e) {
-                alert("Invalid Code. Ensure you pasted the Guest's Answer Code, not the Host Code.");
+                console.error(e);
+                alert("Connection Error: " + e.message);
             }
         }
 
@@ -517,15 +534,19 @@
 
         async function toggleScreen() {
             if(!screenStream) {
-                screenStream = await navigator.mediaDevices.getDisplayMedia({video:true});
-                const t = screenStream.getVideoTracks()[0];
-                pc.getSenders().find(s=>s.track.kind==='video').replaceTrack(t);
-                t.onended = () => {
-                    pc.getSenders().find(s=>s.track.kind==='video').replaceTrack(localStream.getVideoTracks()[0]);
-                    screenStream = null;
-                    document.getElementById('share-btn').classList.remove('active-state');
-                };
-                document.getElementById('share-btn').classList.add('active-state');
+                try {
+                    screenStream = await navigator.mediaDevices.getDisplayMedia({video:true});
+                    const t = screenStream.getVideoTracks()[0];
+                    const sender = pc.getSenders().find(s=>s.track.kind==='video');
+                    if(sender) sender.replaceTrack(t);
+                    t.onended = () => {
+                        const sender = pc.getSenders().find(s=>s.track.kind==='video');
+                        if(sender) sender.replaceTrack(localStream.getVideoTracks()[0]);
+                        screenStream = null;
+                        document.getElementById('share-btn').classList.remove('active-state');
+                    };
+                    document.getElementById('share-btn').classList.add('active-state');
+                } catch(e) { console.error(e); }
             }
         }
 
