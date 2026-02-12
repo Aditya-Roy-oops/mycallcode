@@ -657,14 +657,8 @@
             btn.classList.toggle('bg-slate-800', !isCaptionsOn);
             
             const overlay = document.getElementById('caption-container');
-            if(isCaptionsOn) {
-                overlay.classList.remove('hidden');
-                // Ensure recognition is running
-                if (recognition) { try { recognition.start(); } catch(e){} }
-            } else {
-                overlay.classList.add('hidden');
-                if (recognition) { try { recognition.stop(); } catch(e){} }
-            }
+            if(isCaptionsOn) overlay.classList.remove('hidden');
+            else overlay.classList.add('hidden');
             
             showToast(isCaptionsOn ? "Captions Enabled" : "Captions Disabled");
         }
@@ -672,39 +666,26 @@
         function startSpeechRecognition() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             
-            if (!SpeechRecognition) {
-                console.log("Speech Recognition not supported");
-                return;
-            }
+            if (SpeechRecognition) {
+                recognition = new SpeechRecognition();
+                recognition.continuous = true;
+                recognition.interimResults = true;
+                recognition.lang = 'en-US';
 
-            recognition = new SpeechRecognition();
-            recognition.continuous = true;
-            recognition.interimResults = true;
-            recognition.lang = 'en-US';
-
-            recognition.onresult = (event) => {
-                let interimTranscript = '';
-                for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    if (event.results[i].isFinal) {
-                        const text = event.results[i][0].transcript;
-                        if (dataChannel && dataChannel.readyState === 'open') {
-                            dataChannel.send(JSON.stringify({ type: 'caption', content: text }));
+                recognition.onresult = (event) => {
+                    let interimTranscript = '';
+                    for (let i = event.resultIndex; i < event.results.length; ++i) {
+                        if (event.results[i].isFinal) {
+                            const text = event.results[i][0].transcript;
+                            if (dataChannel && dataChannel.readyState === 'open') {
+                                dataChannel.send(JSON.stringify({ type: 'caption', content: text }));
+                            }
+                            if(isCaptionsOn) showCaption(text);
                         }
-                        if(isCaptionsOn) showCaption(text);
                     }
-                }
-            };
-            
-            // Critical Fix: Restart recognition if it stops unexpectedly while active
-            recognition.onend = () => {
-                if (isCaptionsOn) {
-                    try { recognition.start(); } catch(e) {}
-                }
-            };
-            
-            recognition.onerror = (event) => {
-                console.error("Speech Recognition Error", event.error);
-            };
+                };
+                try { recognition.start(); } catch(e) {}
+            }
         }
 
         let captionTimeout;
@@ -719,62 +700,27 @@
         }
 
         async function toggleScreen() {
-            // Check if mobile/supported
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-                showToast("Screen sharing not supported on this device/browser.");
-                return;
-            }
-
             if (!screenStream) {
                 try {
-                    screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, cursor: true });
+                    screenStream = await navigator.mediaDevices.getDisplayMedia({ cursor: true });
                     const screenTrack = screenStream.getVideoTracks()[0];
-                    
-                    // Replace video track for remote peer
-                    if (peerConnection) {
-                        const sender = peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
-                        if(sender) sender.replaceTrack(screenTrack);
-                    }
-                    
-                    // Show local preview of screen
+                    const sender = peerConnection.getSenders().find(s => s.track.kind === 'video');
+                    if(sender) sender.replaceTrack(screenTrack);
                     localVideo.srcObject = screenStream;
-                    
-                    // UI Update
                     document.getElementById('btn-screen').classList.replace('bg-slate-800', 'bg-blue-600');
-                    
-                    // Handle "Stop Sharing" from browser UI
-                    screenTrack.onended = () => {
-                        stopScreenSharing();
-                    };
+                    screenTrack.onended = () => toggleScreen();
                 } catch (err) {
-                    console.error("Screen Share Error:", err);
-                    if (err.name !== 'NotAllowedError') {
-                        showToast("Failed to start screen share.");
-                    }
+                    console.error(err);
                 }
             } else {
-                stopScreenSharing();
-            }
-        }
-
-        function stopScreenSharing() {
-            if (!screenStream) return;
-            
-            // Stop tracks
-            screenStream.getTracks().forEach(track => track.stop());
-            screenStream = null;
-
-            // Revert to Camera
-            if (localStream) {
+                screenStream.getTracks().forEach(track => track.stop());
+                screenStream = null;
+                const videoTrack = localStream.getVideoTracks()[0];
+                const sender = peerConnection.getSenders().find(s => s.track.kind === 'video');
+                if(sender) sender.replaceTrack(videoTrack);
                 localVideo.srcObject = localStream;
-                if (peerConnection) {
-                    const sender = peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
-                    if(sender) sender.replaceTrack(localStream.getVideoTracks()[0]);
-                }
+                document.getElementById('btn-screen').classList.replace('bg-blue-600', 'bg-slate-800');
             }
-
-            // UI Update
-            document.getElementById('btn-screen').classList.replace('bg-blue-600', 'bg-slate-800');
         }
 
         function toggleMic() {
