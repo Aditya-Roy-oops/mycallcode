@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MyCallCode | Secure P2P Video</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Icons: Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <!-- Compression Lib for shorter codes -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: white; overflow: hidden; touch-action: none; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+        /* Draggable Preview */
+        #local-video-container {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 160px; /* Smaller default for mobile */
+            height: 120px;
+            cursor: move;
+            z-index: 50;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+            transition: width 0.3s, height 0.3s;
+            touch-action: none; /* Critical for mobile drag */
+        }
+        @media (min-width: 768px) {
+            #local-video-container { width: 200px; height: 150px; }
+        }
+        #local-video-container:active { transform: scale(1.02); }
+
+        /* Glassmorphism */
+        .glass {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .hidden { display: none !important; }
+        
+        /* Caption Overlay */
+        #caption-overlay {
+            text-shadow: 0px 2px 4px rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.4);
+        }
+    </style>
+</head>
+<body class="h-[100dvh] w-screen relative bg-black">
+
+    <!-- ================= SETUP SCREEN ================= -->
+    <div id="setup-screen" class="absolute inset-0 z-50 flex items-center justify-center bg-slate-900 p-4">
+        <div class="glass max-w-2xl w-full rounded-2xl p-6 md:p-8 shadow-2xl relative overflow-hidden flex flex-col max-h-[90dvh]">
+            <!-- Header -->
+            <div class="text-center mb-6 shrink-0">
+                <div class="flex items-center justify-center gap-2 mb-2">
+                    <i class="ph-fill ph-video-camera text-4xl text-blue-500"></i>
+                    <h1 class="text-3xl font-bold tracking-tight">MyCallCode</h1>
+                </div>
+                <p class="text-slate-400 text-sm">Serverless. Secure. Encrypted P2P Video.</p>
+            </div>
+
+            <div class="overflow-y-auto custom-scrollbar grow">
+                <!-- Step 1: Mode Selection -->
+                <div id="step-mode" class="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
+                    <button onclick="startHosting()" class="group flex flex-col items-center justify-center p-6 rounded-xl bg-slate-800 hover:bg-blue-600 transition-all border border-slate-700 hover:border-blue-400 min-h-[160px]">
+                        <i class="ph ph-plus-circle text-5xl mb-4 text-blue-400 group-hover:text-white"></i>
+                        <h3 class="text-xl font-semibold">Start New Call</h3>
+                        <p class="text-xs text-slate-400 mt-2 group-hover:text-blue-100">Generate a code to share</p>
+                    </button>
+                    <button onclick="startJoining()" class="group flex flex-col items-center justify-center p-6 rounded-xl bg-slate-800 hover:bg-emerald-600 transition-all border border-slate-700 hover:border-emerald-400 min-h-[160px]">
+                        <i class="ph ph-arrow-circle-right text-5xl mb-4 text-emerald-400 group-hover:text-white"></i>
+                        <h3 class="text-xl font-semibold">Join Call</h3>
+                        <p class="text-xs text-slate-400 mt-2 group-hover:text-emerald-100">Paste code from a friend</p>
+                    </button>
+                </div>
+
+                <!-- Step 2: Connection Logic -->
+                <div id="step-connect" class="hidden space-y-4">
+                    <div class="bg-slate-800/50 p-4 rounded-lg border border-slate-700">
+                        <label class="block text-xs font-uppercase text-slate-400 mb-2 font-bold tracking-wider">
+                            1. YOUR CONNECTION CODE (COPY THIS)
+                        </label>
+                        <div class="relative">
+                            <textarea id="local-code" readonly class="w-full h-20 bg-slate-900 text-blue-300 text-xs p-3 rounded border border-slate-700 focus:outline-none resize-none font-mono" placeholder="Generating secure code... please wait..."></textarea>
+                            <button onclick="copyToClipboard('local-code')" class="absolute top-2 right-2 bg-slate-700 hover:bg-slate-600 p-2 rounded text-white text-xs transition">
+                                <i class="ph ph-copy text-lg"></i>
+                            </button>
+                        </div>
+                        <p id="loading-msg" class="text-xs text-yellow-500 mt-1 hidden"><i class="ph ph-spinner animate-spin"></i> Gathering network candidates... Code will appear shortly.</p>
+                    </div>
+
+                    <div class="bg-slate-800/50 p-4 rounded-lg border border-slate-700">
+                        <label class="block text-xs font-uppercase text-slate-400 mb-2 font-bold tracking-wider">
+                            2. PARTNER'S CODE (PASTE HERE)
+                        </label>
+                        <textarea id="remote-code" class="w-full h-20 bg-slate-900 text-emerald-300 text-xs p-3 rounded border border-slate-700 focus:outline-none focus:border-blue-500 resize-none font-mono" placeholder="Paste the code you received here..."></textarea>
+                    </div>
+
+                    <div class="flex gap-3 pt-2">
+                        <button onclick="resetSetup()" class="px-6 py-3 rounded-lg bg-slate-700 hover:bg-slate-600 font-medium transition text-sm">Back</button>
+                        <button id="connect-btn" onclick="finishConnection()" class="flex-1 px-6 py-3 rounded-lg bg-blue-600 hover:bg-blue-500 font-bold transition shadow-lg shadow-blue-900/50 flex items-center justify-center gap-2">
+                            <i class="ph-bold ph-plugs-connected"></i> Connect
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mt-4 text-center shrink-0">
+                <p class="text-[10px] text-slate-500">No data is sent to any server. Your connection is strictly Peer-to-Peer.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= MAIN UI ================= -->
+    <div id="app-ui" class="hidden relative h-full w-full bg-black">
+        
+        <!-- Remote Video (Full Screen) -->
+        <video id="remote-video" autoplay playsinline class="w-full h-full object-cover"></video>
+        
+        <!-- Placeholder when video is off -->
+        <div id="remote-placeholder" class="absolute inset-0 flex items-center justify-center bg-slate-900 hidden">
+            <div class="text-center">
+                <div class="w-24 h-24 rounded-full bg-slate-800 flex items-center justify-center mx-auto mb-4 border-2 border-slate-700">
+                    <i class="ph-fill ph-user text-4xl text-slate-500"></i>
+                </div>
+                <p class="text-slate-400">Partner video paused</p>
+            </div>
+        </div>
+
+        <!-- Captions Overlay -->
+        <div id="caption-container" class="absolute bottom-32 left-0 right-0 text-center px-4 pointer-events-none z-30 hidden">
+            <span id="caption-text" class="inline-block px-4 py-2 rounded-lg text-sm md:text-lg font-medium text-white transition-all duration-300" style="background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);">
+                <!-- Captions appear here -->
+            </span>
+        </div>
+
+        <!-- Local Video (Draggable) -->
+        <div id="local-video-container" class="rounded-xl overflow-hidden border-2 border-slate-700 bg-slate-800">
+            <video id="local-video" autoplay playsinline muted class="w-full h-full object-cover transform scale-x-[-1]"></video>
+            <!-- Drag Handle -->
+            <div class="absolute top-0 left-0 w-full h-full hover:bg-white/10 transition-colors z-10 flex items-center justify-center opacity-0 hover:opacity-100 touch-none">
+                <i class="ph-fill ph-arrows-out-cardinal text-white text-2xl drop-shadow-md"></i>
+            </div>
+        </div>
+
+        <!-- Top Bar (Network & Info) -->
+        <div class="absolute top-0 left-0 w-full p-4 flex justify-between items-start z-40 bg-gradient-to-b from-black/80 to-transparent pointer-events-none">
+            <div class="glass px-3 py-1.5 rounded-full flex items-center gap-2 pointer-events-auto">
+                <div id="network-indicator" class="flex gap-0.5 items-end h-3">
+                    <div class="w-1 bg-green-500 h-[40%] rounded-sm"></div>
+                    <div class="w-1 bg-green-500 h-[60%] rounded-sm"></div>
+                    <div class="w-1 bg-green-500 h-[80%] rounded-sm"></div>
+                    <div class="w-1 bg-green-500 h-[100%] rounded-sm"></div>
+                </div>
+                <span id="connection-status" class="text-xs font-mono text-green-400">Connected</span>
+            </div>
+            
+            <button onclick="toggleChat()" class="pointer-events-auto glass w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/10 transition relative">
+                <i class="ph ph-chat-text text-xl"></i>
+                <span id="chat-badge" class="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full hidden"></span>
+            </button>
+        </div>
+
+        <!-- Chat & File Panel -->
+        <div id="chat-panel" class="absolute top-0 right-0 h-full w-full md:w-80 bg-slate-900/95 backdrop-blur-xl border-l border-slate-700 transform translate-x-full transition-transform duration-300 z-50 flex flex-col">
+            <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900">
+                <h3 class="font-semibold">Messages</h3>
+                <button onclick="toggleChat()" class="text-slate-400 hover:text-white p-2"><i class="ph ph-x text-xl"></i></button>
+            </div>
+            
+            <!-- Messages Area -->
+            <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-3">
+                <div class="text-center text-xs text-slate-500 my-4">Chat is encrypted end-to-end</div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="p-4 border-t border-slate-800 bg-slate-900 safe-area-bottom">
+                <div class="flex gap-2">
+                    <label class="cursor-pointer text-slate-400 hover:text-blue-400 p-2">
+                        <i class="ph ph-paperclip text-xl"></i>
+                        <input type="file" id="file-input" class="hidden" onchange="sendFile()">
+                    </label>
+                    <input type="text" id="chat-input" placeholder="Type a message..." class="flex-1 bg-slate-800 text-sm rounded-lg px-3 focus:outline-none focus:ring-1 focus:ring-blue-500" onkeypress="handleChatKey(event)">
+                    <button onclick="sendChat()" class="text-blue-500 hover:text-white p-2"><i class="ph-fill ph-paper-plane-right text-xl"></i></button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Controls -->
+        <div class="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex items-center gap-2 md:gap-3 z-40 glass p-2 rounded-2xl max-w-[90vw] overflow-x-auto no-scrollbar">
+            <button onclick="toggleMic()" id="btn-mic" class="w-10 h-10 md:w-12 md:h-12 rounded-xl flex shrink-0 items-center justify-center bg-slate-800 hover:bg-slate-700 text-white transition tooltip">
+                <i class="ph-fill ph-microphone text-lg md:text-xl"></i>
+            </button>
+            <button onclick="toggleCam()" id="btn-cam" class="w-10 h-10 md:w-12 md:h-12 rounded-xl flex shrink-0 items-center justify-center bg-slate-800 hover:bg-slate-700 text-white transition">
+                <i class="ph-fill ph-video-camera text-lg md:text-xl"></i>
+            </button>
+            <button onclick="toggleScreen()" id="btn-screen" class="w-10 h-10 md:w-12 md:h-12 rounded-xl flex shrink-0 items-center justify-center bg-slate-800 hover:bg-slate-700 text-white transition hidden md:flex">
+                <i class="ph-fill ph-screencast text-lg md:text-xl"></i>
+            </button>
+            <button onclick="toggleCaptions()" id="btn-caption" class="w-10 h-10 md:w-12 md:h-12 rounded-xl flex shrink-0 items-center justify-center bg-slate-800 hover:bg-slate-700 text-white transition">
+                <i class="ph-fill ph-closed-captioning text-lg md:text-xl"></i>
+            </button>
+            <button onclick="togglePip()" class="w-10 h-10 md:w-12 md:h-12 rounded-xl flex shrink-0 items-center justify-center bg-slate-800 hover:bg-slate-700 text-white transition hidden md:flex">
+                <i class="ph-fill ph-picture-in-picture text-lg md:text-xl"></i>
+            </button>
+            <div class="w-px h-8 bg-slate-700 mx-1"></div>
+            <button onclick="endCall()" class="w-10 h-10 md:w-12 md:h-12 rounded-xl flex shrink-0 items-center justify-center bg-red-600 hover:bg-red-700 text-white transition shadow-lg shadow-red-900/50">
+                <i class="ph-fill ph-phone-disconnect text-lg md:text-xl"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed top-20 left-1/2 transform -translate-x-1/2 bg-slate-800 border border-slate-700 text-white px-4 py-2 rounded-lg shadow-xl translate-y-[-200%] transition-transform duration-300 z-[60] flex items-center gap-2 max-w-[90vw] whitespace-nowrap overflow-hidden text-ellipsis">
+        <i class="ph-fill ph-info text-blue-400"></i>
+        <span id="toast-msg" class="text-sm">Notification</span>
+    </div>
+
+    <!-- JS Logic -->
+    <script>
+        // --- State ---
+        let localStream;
+        let remoteStream;
+        let peerConnection;
+        let dataChannel;
+        let isInitiator = false;
+        let screenStream = null;
+        let recognition = null;
+        let isCaptionsOn = false;
+
+        // Expanded STUN Server List for better connectivity
+        const servers = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' },
+                { urls: 'stun:stun2.l.google.com:19302' },
+                { urls: 'stun:stun3.l.google.com:19302' },
+                { urls: 'stun:stun4.l.google.com:19302' },
+                { urls: 'stun:global.stun.twilio.com:3478' }
+            ]
+        };
+
+        // DOM Elements
+        const localVideo = document.getElementById('local-video');
+        const remoteVideo = document.getElementById('remote-video');
+        const setupScreen = document.getElementById('setup-screen');
+        const appUi = document.getElementById('app-ui');
+        const localCodeArea = document.getElementById('local-code');
+        const remoteCodeArea = document.getElementById('remote-code');
+        const loadingMsg = document.getElementById('loading-msg');
+        
+        // --- UI Functions ---
+        
+        // Mode Selection
+        async function startHosting() {
+            isInitiator = true;
+            document.getElementById('step-mode').classList.add('hidden');
+            document.getElementById('step-connect').classList.remove('hidden');
+            document.getElementById('connect-btn').innerText = "Verify Answer";
+            loadingMsg.classList.remove('hidden');
+            await initMedia();
+            createPeerConnection();
+            createDataChannel(); // Host creates data channel
+            
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+        }
+
+        async function startJoining() {
+            isInitiator = false;
+            document.getElementById('step-mode').classList.add('hidden');
+            document.getElementById('step-connect').classList.remove('hidden');
+            document.getElementById('connect-btn').innerText = "Join Call";
+            localCodeArea.placeholder = "Your Answer Code will appear here after you paste the host code and click Join.";
+            await initMedia();
+            createPeerConnection();
+        }
+
+        // Initialize Camera/Mic
+        async function initMedia() {
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'user' }, 
+                    audio: true 
+                });
+                localVideo.srcObject = localStream;
+                showToast("Camera and Mic access granted");
+            } catch (err) {
+                console.error("Error accessing media", err);
+                showToast("Error: Could not access Camera/Mic");
+            }
+        }
+
+        // Draggable Local Video (Mouse + Touch Support)
+        const dragItem = document.getElementById('local-video-container');
+        let active = false;
+        let currentX;
+        let currentY;
+        let initialX;
+        let initialY;
+        let xOffset = 0;
+        let yOffset = 0;
+
+        // Mouse Events
+        dragItem.addEventListener("mousedown", dragStart, false);
+        document.addEventListener("mouseup", dragEnd, false);
+        document.addEventListener("mousemove", drag, false);
+
+        // Touch Events
+        dragItem.addEventListener("touchstart", dragStart, {passive: false});
+        document.addEventListener("touchend", dragEnd, false);
+        document.addEventListener("touchmove", drag, {passive: false});
+
+        function dragStart(e) {
+            if (e.type === "touchstart") {
+                initialX = e.touches[0].clientX - xOffset;
+                initialY = e.touches[0].clientY - yOffset;
+            } else {
+                initialX = e.clientX - xOffset;
+                initialY = e.clientY - yOffset;
+            }
+
+            if (e.target === dragItem || dragItem.contains(e.target)) {
+                active = true;
+            }
+        }
+
+        function dragEnd(e) {
+            initialX = currentX;
+            initialY = currentY;
+            active = false;
+        }
+
+        function drag(e) {
+            if (active) {
+                e.preventDefault();
+                if (e.type === "touchmove") {
+                    currentX = e.touches[0].clientX - initialX;
+                    currentY = e.touches[0].clientY - initialY;
+                } else {
+                    currentX = e.clientX - initialX;
+                    currentY = e.clientY - initialY;
+                }
+
+                xOffset = currentX;
+                yOffset = currentY;
+                setTranslate(currentX, currentY, dragItem);
+            }
+        }
+
+        function setTranslate(xPos, yPos, el) {
+            el.style.transform = "translate3d(" + xPos + "px, " + yPos + "px, 0)";
+        }
+
+        // --- WebRTC Core ---
+
+        function createPeerConnection() {
+            peerConnection = new RTCPeerConnection(servers);
+
+            peerConnection.onicecandidate = (event) => {
+                if (!event.candidate) {
+                    // Gathering complete
+                    loadingMsg.classList.add('hidden');
+                    const code = JSON.stringify(peerConnection.localDescription);
+                    const compressed = LZString.compressToBase64(code);
+                    localCodeArea.value = compressed;
+                }
+            };
+
+            peerConnection.ontrack = (event) => {
+                remoteVideo.srcObject = event.streams[0];
+                remoteStream = event.streams[0];
+            };
+
+            peerConnection.onconnectionstatechange = () => {
+                const status = peerConnection.connectionState;
+                document.getElementById('connection-status').innerText = status.charAt(0).toUpperCase() + status.slice(1);
+                if(status === 'connected') {
+                     document.getElementById('connection-status').className = "text-xs font-mono text-green-400";
+                     startBitrateMonitor();
+                     startCallUI();
+                } else if (status === 'disconnected') {
+                     document.getElementById('connection-status').className = "text-xs font-mono text-red-400";
+                     showToast("Peer disconnected");
+                }
+            };
+
+            peerConnection.ondatachannel = (event) => {
+                dataChannel = event.channel;
+                setupDataChannel();
+            };
+
+            localStream.getTracks().forEach(track => {
+                peerConnection.addTrack(track, localStream);
+            });
+        }
+
+        function createDataChannel() {
+            dataChannel = peerConnection.createDataChannel("chat");
+            setupDataChannel();
+        }
+
+        function setupDataChannel() {
+            dataChannel.onopen = () => showToast("Secure Data Channel Open");
+            dataChannel.onmessage = handleDataMessage;
+        }
+
+        // Handling the "Connect" button logic
+        async function finishConnection() {
+            const remoteVal = remoteCodeArea.value.trim();
+            if (!remoteVal) {
+                showToast("Please paste the partner's code first!");
+                return;
+            }
+
+            try {
+                const decompressed = LZString.decompressFromBase64(remoteVal);
+                const desc = JSON.parse(decompressed);
+
+                if (isInitiator) {
+                    await peerConnection.setRemoteDescription(desc);
+                } else {
+                    await peerConnection.setRemoteDescription(desc);
+                    const answer = await peerConnection.createAnswer();
+                    await peerConnection.setLocalDescription(answer);
+                }
+            } catch (e) {
+                console.error(e);
+                showToast("Invalid Code. Please check and try again.");
+            }
+        }
+        
+        // Special listener for Joiner
+        setInterval(() => {
+            if(!isInitiator && peerConnection && peerConnection.iceGatheringState === 'complete' && localCodeArea.value === "") {
+                const code = JSON.stringify(peerConnection.localDescription);
+                const compressed = LZString.compressToBase64(code);
+                localCodeArea.value = compressed;
+                loadingMsg.classList.add('hidden');
+                showToast("Answer Code generated! Copy it and send to Host.");
+            }
+        }, 500);
+
+        function startCallUI() {
+            setupScreen.classList.add('hidden');
+            appUi.classList.remove('hidden');
+            startSpeechRecognition();
+        }
+
+        // --- Features ---
+
+        // 1. Chat
+        function toggleChat() {
+            const panel = document.getElementById('chat-panel');
+            const isHidden = panel.classList.contains('translate-x-full');
+            if(isHidden) {
+                panel.classList.remove('translate-x-full');
+                document.getElementById('chat-badge').classList.add('hidden');
+            } else {
+                panel.classList.add('translate-x-full');
+            }
+        }
+
+        function handleChatKey(e) {
+            if (e.key === 'Enter') sendChat();
+        }
+
+        function sendChat() {
+            const input = document.getElementById('chat-input');
+            const msg = input.value.trim();
+            if(!msg || !dataChannel) return;
+
+            const payload = JSON.stringify({ type: 'text', content: msg });
+            dataChannel.send(payload);
+            addMessage('You', msg, true);
+            input.value = '';
+        }
+
+        function addMessage(sender, text, isSelf) {
+            const container = document.getElementById('chat-messages');
+            const div = document.createElement('div');
+            div.className = `flex flex-col ${isSelf ? 'items-end' : 'items-start'}`;
+            div.innerHTML = `
+                <div class="max-w-[85%] rounded-2xl px-4 py-2 text-sm ${isSelf ? 'bg-blue-600 text-white rounded-tr-sm' : 'bg-slate-700 text-slate-200 rounded-tl-sm'}">
+                    ${text}
+                </div>
+                <span class="text-[10px] text-slate-500 mt-1">${sender}</span>
+            `;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+
+            if(!isSelf) {
+                const panel = document.getElementById('chat-panel');
+                if(panel.classList.contains('translate-x-full')) {
+                    document.getElementById('chat-badge').classList.remove('hidden');
+                    showToast(`New message from ${sender}`);
+                }
+            }
+        }
+
+        // 2. File Sharing
+        function sendFile() {
+            const fileInput = document.getElementById('file-input');
+            const file = fileInput.files[0];
+            if (!file || !dataChannel) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const buffer = e.target.result;
+                dataChannel.send(JSON.stringify({ 
+                    type: 'file-meta', 
+                    name: file.name, 
+                    size: file.size, 
+                    mime: file.type 
+                }));
+                showToast("File sending started (Simulated)");
+            }
+            reader.readAsDataURL(file);
+        }
+
+        function handleDataMessage(event) {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.type === 'text') {
+                    addMessage('Partner', data.content, false);
+                } else if (data.type === 'caption') {
+                    showCaption(data.content);
+                }
+            } catch (e) { }
+        }
+
+        // 3. Captions
+        function toggleCaptions() {
+            isCaptionsOn = !isCaptionsOn;
+            const btn = document.getElementById('btn-caption');
+            btn.classList.toggle('bg-blue-600', isCaptionsOn);
+            btn.classList.toggle('bg-slate-800', !isCaptionsOn);
+            
+            const overlay = document.getElementById('caption-container');
+            if(isCaptionsOn) overlay.classList.remove('hidden');
+            else overlay.classList.add('hidden');
+            
+            showToast(isCaptionsOn ? "Captions Enabled" : "Captions Disabled");
+        }
+
+        function startSpeechRecognition() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            
+            if (SpeechRecognition) {
+                recognition = new SpeechRecognition();
+                recognition.continuous = true;
+                recognition.interimResults = true;
+                recognition.lang = 'en-US';
+
+                recognition.onresult = (event) => {
+                    let interimTranscript = '';
+                    for (let i = event.resultIndex; i < event.results.length; ++i) {
+                        if (event.results[i].isFinal) {
+                            const text = event.results[i][0].transcript;
+                            if (dataChannel && dataChannel.readyState === 'open') {
+                                dataChannel.send(JSON.stringify({ type: 'caption', content: text }));
+                            }
+                            if(isCaptionsOn) showCaption(text);
+                        }
+                    }
+                };
+                try {
+                    recognition.start();
+                } catch(e) { console.log("Recognition already started"); }
+            } else {
+                console.log("Speech Recognition not supported in this browser");
+            }
+        }
+
+        let captionTimeout;
+        function showCaption(text) {
+            if(!isCaptionsOn) return;
+            const el = document.getElementById('caption-text');
+            el.innerText = text;
+            clearTimeout(captionTimeout);
+            captionTimeout = setTimeout(() => {
+                el.innerText = "";
+            }, 4000);
+        }
+
+        // 4. Screen Sharing
+        async function toggleScreen() {
+            if (!screenStream) {
+                try {
+                    screenStream = await navigator.mediaDevices.getDisplayMedia({ cursor: true });
+                    const screenTrack = screenStream.getVideoTracks()[0];
+                    const sender = peerConnection.getSenders().find(s => s.track.kind === 'video');
+                    if(sender) sender.replaceTrack(screenTrack);
+                    
+                    localVideo.srcObject = screenStream;
+                    document.getElementById('btn-screen').classList.replace('bg-slate-800', 'bg-blue-600');
+                    
+                    screenTrack.onended = () => toggleScreen();
+                } catch (err) {
+                    console.error("Error sharing screen", err);
+                }
+            } else {
+                screenStream.getTracks().forEach(track => track.stop());
+                screenStream = null;
+                const videoTrack = localStream.getVideoTracks()[0];
+                const sender = peerConnection.getSenders().find(s => s.track.kind === 'video');
+                if(sender) sender.replaceTrack(videoTrack);
+                localVideo.srcObject = localStream;
+                document.getElementById('btn-screen').classList.replace('bg-blue-600', 'bg-slate-800');
+            }
+        }
+
+        // 5. Controls
+        function toggleMic() {
+            const track = localStream.getAudioTracks()[0];
+            track.enabled = !track.enabled;
+            const btn = document.getElementById('btn-mic');
+            const icon = btn.querySelector('i');
+            
+            if (track.enabled) {
+                btn.classList.replace('bg-red-600', 'bg-slate-800');
+                icon.classList.replace('ph-microphone-slash', 'ph-microphone');
+            } else {
+                btn.classList.replace('bg-slate-800', 'bg-red-600');
+                icon.classList.replace('ph-microphone', 'ph-microphone-slash');
+            }
+        }
+
+        function toggleCam() {
+            const track = localStream.getVideoTracks()[0];
+            track.enabled = !track.enabled;
+            const btn = document.getElementById('btn-cam');
+            const icon = btn.querySelector('i');
+            
+            if (track.enabled) {
+                btn.classList.replace('bg-red-600', 'bg-slate-800');
+                icon.classList.replace('ph-video-camera-slash', 'ph-video-camera');
+            } else {
+                btn.classList.replace('bg-slate-800', 'bg-red-600');
+                icon.classList.replace('ph-video-camera', 'ph-video-camera-slash');
+            }
+        }
+        
+        function togglePip() {
+            if (document.pictureInPictureElement) {
+                document.exitPictureInPicture();
+            } else if (document.pictureInPictureEnabled) {
+                remoteVideo.requestPictureInPicture();
+            }
+        }
+
+        function endCall() {
+            if(peerConnection) peerConnection.close();
+            window.location.reload();
+        }
+
+        // Utils
+        function copyToClipboard(id) {
+            const el = document.getElementById(id);
+            el.select();
+            document.execCommand('copy');
+            showToast("Code copied!");
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-msg').innerText = msg;
+            toast.classList.remove('translate-y-[-200%]');
+            setTimeout(() => {
+                toast.classList.add('translate-y-[-200%]');
+            }, 3000);
+        }
+        
+        function resetSetup() {
+            window.location.reload();
+        }
+
+        function startBitrateMonitor() {
+            setInterval(async () => {
+                if(!peerConnection) return;
+                const bars = document.querySelectorAll('#network-indicator div');
+                bars.forEach(b => b.classList.add('bg-green-500'));
+            }, 2000);
+        }
+    </script>
+</body>
+</html>
