@@ -213,13 +213,13 @@
         <!-- Top Bar (Network & Info) -->
         <div class="absolute top-0 left-0 w-full p-4 flex justify-between items-start z-40 bg-gradient-to-b from-black/80 to-transparent pointer-events-none">
             <div class="glass px-3 py-1.5 rounded-full flex items-center gap-2 pointer-events-auto">
-                <div id="network-indicator" class="flex gap-0.5 items-end h-3">
-                    <div class="w-1 bg-green-500 h-[40%] rounded-sm"></div>
-                    <div class="w-1 bg-green-500 h-[60%] rounded-sm"></div>
-                    <div class="w-1 bg-green-500 h-[80%] rounded-sm"></div>
-                    <div class="w-1 bg-green-500 h-[100%] rounded-sm"></div>
+                <div id="network-indicator" class="flex gap-0.5 items-end h-3" title="Network Strength">
+                    <div class="w-1 h-[40%] rounded-sm bg-slate-600 transition-colors duration-300"></div>
+                    <div class="w-1 h-[60%] rounded-sm bg-slate-600 transition-colors duration-300"></div>
+                    <div class="w-1 h-[80%] rounded-sm bg-slate-600 transition-colors duration-300"></div>
+                    <div class="w-1 h-[100%] rounded-sm bg-slate-600 transition-colors duration-300"></div>
                 </div>
-                <span id="connection-status" class="text-xs font-mono text-green-400">Connected</span>
+                <span id="connection-status" class="text-xs font-mono text-green-400 min-w-[50px] text-center">Ready</span>
             </div>
             
             <button onclick="toggleChat()" class="pointer-events-auto glass w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/10 transition relative">
@@ -261,7 +261,7 @@
             <button onclick="toggleCam()" id="btn-cam" class="w-10 h-10 md:w-12 md:h-12 rounded-xl flex shrink-0 items-center justify-center bg-slate-800 hover:bg-slate-700 text-white transition">
                 <i class="ph-fill ph-video-camera text-lg md:text-xl"></i>
             </button>
-            <button onclick="toggleScreen()" id="btn-screen" class="w-10 h-10 md:w-12 md:h-12 rounded-xl flex shrink-0 items-center justify-center bg-slate-800 hover:bg-slate-700 text-white transition hidden md:flex">
+            <button onclick="toggleScreen()" id="btn-screen" class="w-10 h-10 md:w-12 md:h-12 rounded-xl flex shrink-0 items-center justify-center bg-slate-800 hover:bg-slate-700 text-white transition hidden md:flex" title="Share Screen with Video Support">
                 <i class="ph-fill ph-screencast text-lg md:text-xl"></i>
             </button>
             <button onclick="toggleCaptions()" id="btn-caption" class="w-10 h-10 md:w-12 md:h-12 rounded-xl flex shrink-0 items-center justify-center bg-slate-800 hover:bg-slate-700 text-white transition">
@@ -294,7 +294,8 @@
         let screenStream = null;
         let recognition = null;
         let isCaptionsOn = false;
-        let iceGatheringTimeout = null; // Important: Timeout fallback
+        let iceGatheringTimeout = null;
+        let bitrateInterval = null; // New state for interval
 
         // STUN Server List
         const servers = {
@@ -332,7 +333,7 @@
             try {
                 const offer = await peerConnection.createOffer();
                 await peerConnection.setLocalDescription(offer);
-                startIceTimeout(); // Fallback trigger
+                startIceTimeout();
             } catch(e) {
                 console.error(e);
                 showToast("Error creating offer");
@@ -395,7 +396,7 @@
                 await peerConnection.setRemoteDescription(desc);
                 const answer = await peerConnection.createAnswer();
                 await peerConnection.setLocalDescription(answer);
-                startIceTimeout(); // Fallback trigger
+                startIceTimeout();
                 
                 // Move UI to step 2 immediately
                 document.getElementById('join-step-1').classList.add('hidden');
@@ -407,7 +408,7 @@
             }
         }
 
-        // Initialize Camera/Mic with Error Handling
+        // Initialize Camera/Mic
         async function initMedia() {
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ 
@@ -423,7 +424,7 @@
             }
         }
 
-        // Draggable Local Video Logic
+        // Draggable Logic
         const dragItem = document.getElementById('local-video-container');
         let active = false;
         let currentX;
@@ -435,10 +436,8 @@
 
         dragItem.addEventListener("mousedown", dragStart, false);
         dragItem.addEventListener("touchstart", dragStart, {passive: false});
-
         document.addEventListener("mouseup", dragEnd, false);
         document.addEventListener("touchend", dragEnd, false);
-
         document.addEventListener("mousemove", drag, false);
         document.addEventListener("touchmove", drag, {passive: false});
 
@@ -454,13 +453,11 @@
                 active = true;
             }
         }
-
         function dragEnd(e) {
             initialX = currentX;
             initialY = currentY;
             active = false;
         }
-
         function drag(e) {
             if (active) {
                 e.preventDefault();
@@ -476,7 +473,6 @@
                 setTranslate(currentX, currentY, dragItem);
             }
         }
-
         function setTranslate(xPos, yPos, el) {
             el.style.transform = "translate3d(" + xPos + "px, " + yPos + "px, 0)";
         }
@@ -488,7 +484,7 @@
 
             peerConnection.onicecandidate = (event) => {
                 if (!event.candidate) {
-                    generateCodeNow(); // Finished gathering
+                    generateCodeNow(); 
                 }
             };
 
@@ -499,14 +495,20 @@
 
             peerConnection.onconnectionstatechange = () => {
                 const status = peerConnection.connectionState;
-                document.getElementById('connection-status').innerText = status.charAt(0).toUpperCase() + status.slice(1);
+                const statusEl = document.getElementById('connection-status');
                 
                 if(status === 'connected') {
-                     document.getElementById('connection-status').className = "text-xs font-mono text-green-400";
+                     statusEl.innerText = "Connected";
+                     statusEl.className = "text-xs font-mono text-green-400 min-w-[50px] text-center";
                      startCallUI();
+                     startNetworkMonitor(); // Start real monitoring
                 } else if (status === 'disconnected' || status === 'failed') {
-                     document.getElementById('connection-status').className = "text-xs font-mono text-red-400";
+                     statusEl.innerText = "Offline";
+                     statusEl.className = "text-xs font-mono text-red-400 min-w-[50px] text-center";
                      showToast("Connection Lost");
+                     stopNetworkMonitor();
+                } else {
+                     statusEl.innerText = status.charAt(0).toUpperCase() + status.slice(1);
                 }
             };
 
@@ -522,19 +524,16 @@
             }
         }
 
-        // IMPORTANT: Fallback if ICE gathering takes too long (common on mobile)
         function startIceTimeout() {
             if(iceGatheringTimeout) clearTimeout(iceGatheringTimeout);
             iceGatheringTimeout = setTimeout(() => {
                 console.log("Forcing code generation after timeout...");
                 generateCodeNow();
-            }, 2500); // Wait 2.5s max for candidates
+            }, 2500); 
         }
 
         function generateCodeNow() {
             if(iceGatheringTimeout) clearTimeout(iceGatheringTimeout);
-            
-            // Only generate if we have a description
             if(!peerConnection.localDescription) return;
 
             const code = JSON.stringify(peerConnection.localDescription);
@@ -542,7 +541,7 @@
             
             if(isInitiator) {
                 const el = document.getElementById('host-offer-code');
-                if(el.value === "") { // Only update if empty
+                if(el.value === "") { 
                     el.value = compressed;
                     document.getElementById('host-loading-msg').classList.add('hidden');
                 }
@@ -572,6 +571,52 @@
         }
 
         // --- Features ---
+
+        function startNetworkMonitor() {
+            if(bitrateInterval) clearInterval(bitrateInterval);
+            bitrateInterval = setInterval(async () => {
+                if(!peerConnection) return;
+                try {
+                    const stats = await peerConnection.getStats(null);
+                    let rtt = 0;
+                    
+                    stats.forEach(report => {
+                        if (report.type === 'candidate-pair' && report.state === 'succeeded' && report.currentRoundTripTime) {
+                            rtt = report.currentRoundTripTime * 1000;
+                        }
+                    });
+
+                    const bars = document.querySelectorAll('#network-indicator div');
+                    let strength = 0;
+                    
+                    if (rtt > 0) {
+                        if (rtt < 100) strength = 4;
+                        else if (rtt < 250) strength = 3;
+                        else if (rtt < 500) strength = 2;
+                        else strength = 1;
+                        document.getElementById('connection-status').innerText = `${Math.round(rtt)}ms`;
+                    } else {
+                        document.getElementById('connection-status').innerText = "Conn...";
+                    }
+
+                    bars.forEach((b, i) => {
+                        b.classList.remove('bg-green-500', 'bg-yellow-500', 'bg-red-500', 'bg-slate-600');
+                        if (i < strength) {
+                             if(strength === 4) b.classList.add('bg-green-500');
+                             else if(strength === 3) b.classList.add('bg-green-500');
+                             else if(strength === 2) b.classList.add('bg-yellow-500');
+                             else b.classList.add('bg-red-500');
+                        } else {
+                            b.classList.add('bg-slate-600');
+                        }
+                    });
+                } catch(e) {}
+            }, 2000);
+        }
+
+        function stopNetworkMonitor() {
+            if(bitrateInterval) clearInterval(bitrateInterval);
+        }
 
         function toggleChat() {
             const panel = document.getElementById('chat-panel');
@@ -659,7 +704,6 @@
             const overlay = document.getElementById('caption-container');
             if(isCaptionsOn) {
                 overlay.classList.remove('hidden');
-                // Ensure recognition is running
                 if (recognition) { try { recognition.start(); } catch(e){} }
             } else {
                 overlay.classList.add('hidden');
@@ -695,15 +739,10 @@
                 }
             };
             
-            // Critical Fix: Restart recognition if it stops unexpectedly while active
             recognition.onend = () => {
                 if (isCaptionsOn) {
                     try { recognition.start(); } catch(e) {}
                 }
-            };
-            
-            recognition.onerror = (event) => {
-                console.error("Speech Recognition Error", event.error);
             };
         }
 
@@ -719,7 +758,6 @@
         }
 
         async function toggleScreen() {
-            // Check if mobile/supported
             if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
                 showToast("Screen sharing not supported on this device/browser.");
                 return;
@@ -727,7 +765,12 @@
 
             if (!screenStream) {
                 try {
-                    screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, cursor: true });
+                    // Optimized for video sharing with audio
+                    screenStream = await navigator.mediaDevices.getDisplayMedia({ 
+                        video: { cursor: "always", frameRate: 30 }, 
+                        audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 44100 }
+                    });
+                    
                     const screenTrack = screenStream.getVideoTracks()[0];
                     
                     // Replace video track for remote peer
@@ -742,10 +785,7 @@
                     // UI Update
                     document.getElementById('btn-screen').classList.replace('bg-slate-800', 'bg-blue-600');
                     
-                    // Handle "Stop Sharing" from browser UI
-                    screenTrack.onended = () => {
-                        stopScreenSharing();
-                    };
+                    screenTrack.onended = () => stopScreenSharing();
                 } catch (err) {
                     console.error("Screen Share Error:", err);
                     if (err.name !== 'NotAllowedError') {
@@ -760,11 +800,9 @@
         function stopScreenSharing() {
             if (!screenStream) return;
             
-            // Stop tracks
             screenStream.getTracks().forEach(track => track.stop());
             screenStream = null;
 
-            // Revert to Camera
             if (localStream) {
                 localVideo.srcObject = localStream;
                 if (peerConnection) {
@@ -773,7 +811,6 @@
                 }
             }
 
-            // UI Update
             document.getElementById('btn-screen').classList.replace('bg-blue-600', 'bg-slate-800');
         }
 
@@ -817,6 +854,7 @@
 
         function endCall() {
             if(peerConnection) peerConnection.close();
+            stopNetworkMonitor();
             window.location.reload();
         }
 
@@ -824,7 +862,6 @@
             const el = document.getElementById(id);
             const text = el.value;
             
-            // Modern API attempt
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 try {
                     await navigator.clipboard.writeText(text);
@@ -836,7 +873,6 @@
                 }
             }
 
-            // Fallback
             el.select();
             document.execCommand('copy');
             showToast("Code copied! (Manual selection)");
