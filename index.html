@@ -31,13 +31,13 @@
             position: absolute;
             bottom: 20px;
             right: 20px;
-            width: 160px; /* Smaller default for mobile */
-            height: 120px;
+            width: 120px; /* Even smaller default for mobile */
+            height: 90px;
             cursor: move;
             z-index: 50;
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
             transition: width 0.3s, height 0.3s;
-            touch-action: none; /* Critical for mobile drag */
+            touch-action: none;
         }
         @media (min-width: 768px) {
             #local-video-container { width: 200px; height: 150px; }
@@ -46,13 +46,16 @@
 
         /* Glassmorphism */
         .glass {
-            background: rgba(30, 41, 59, 0.7);
-            backdrop-filter: blur(10px);
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .hidden { display: none !important; }
         
+        /* Prevents iOS zoom on inputs */
+        input, textarea { font-size: 16px !important; }
+
         /* Caption Overlay */
         #caption-overlay {
             text-shadow: 0px 2px 4px rgba(0,0,0,0.8);
@@ -74,17 +77,17 @@
                 <p class="text-slate-400 text-sm">Serverless. Secure. Encrypted P2P Video.</p>
             </div>
 
-            <div class="overflow-y-auto custom-scrollbar grow">
+            <div class="overflow-y-auto custom-scrollbar grow px-1">
                 <!-- Step 0: Mode Selection -->
-                <div id="step-mode" class="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
-                    <button onclick="startHosting()" class="group flex flex-col items-center justify-center p-6 rounded-xl bg-slate-800 hover:bg-blue-600 transition-all border border-slate-700 hover:border-blue-400 min-h-[160px]">
-                        <i class="ph ph-plus-circle text-5xl mb-4 text-blue-400 group-hover:text-white"></i>
-                        <h3 class="text-xl font-semibold">Start New Call</h3>
+                <div id="step-mode" class="grid grid-cols-1 md:grid-cols-2 gap-4 h-full pb-4">
+                    <button onclick="startHosting()" class="group flex flex-col items-center justify-center p-6 rounded-xl bg-slate-800 hover:bg-blue-600 transition-all border border-slate-700 hover:border-blue-400 min-h-[140px]">
+                        <i class="ph ph-plus-circle text-4xl md:text-5xl mb-4 text-blue-400 group-hover:text-white"></i>
+                        <h3 class="text-lg md:text-xl font-semibold">Start New Call</h3>
                         <p class="text-xs text-slate-400 mt-2 group-hover:text-blue-100">I want to host a call</p>
                     </button>
-                    <button onclick="startJoining()" class="group flex flex-col items-center justify-center p-6 rounded-xl bg-slate-800 hover:bg-emerald-600 transition-all border border-slate-700 hover:border-emerald-400 min-h-[160px]">
-                        <i class="ph ph-arrow-circle-right text-5xl mb-4 text-emerald-400 group-hover:text-white"></i>
-                        <h3 class="text-xl font-semibold">Join Call</h3>
+                    <button onclick="startJoining()" class="group flex flex-col items-center justify-center p-6 rounded-xl bg-slate-800 hover:bg-emerald-600 transition-all border border-slate-700 hover:border-emerald-400 min-h-[140px]">
+                        <i class="ph ph-arrow-circle-right text-4xl md:text-5xl mb-4 text-emerald-400 group-hover:text-white"></i>
+                        <h3 class="text-lg md:text-xl font-semibold">Join Call</h3>
                         <p class="text-xs text-slate-400 mt-2 group-hover:text-emerald-100">I have a code to join</p>
                     </button>
                 </div>
@@ -95,18 +98,18 @@
                     <div id="host-step-1" class="space-y-4">
                         <div class="bg-blue-900/30 p-3 rounded border border-blue-800 mb-2">
                             <h3 class="font-bold text-blue-400 text-sm">STEP 1: Share Your Code</h3>
-                            <p class="text-xs text-slate-300">Copy this code and send it to your partner.</p>
+                            <p class="text-xs text-slate-300">Wait for code generation, then send it to your partner.</p>
                         </div>
                         
-                        <div class="relative">
-                            <textarea id="host-offer-code" readonly class="w-full h-24 bg-slate-900 text-blue-300 text-xs p-3 rounded border border-slate-700 focus:outline-none resize-none font-mono" placeholder="Generating secure code..."></textarea>
-                            <button onclick="copyToClipboard('host-offer-code')" class="absolute top-2 right-2 bg-slate-700 hover:bg-slate-600 p-2 rounded text-white text-xs transition">
+                        <div class="relative group">
+                            <textarea id="host-offer-code" readonly onclick="this.select()" class="w-full h-28 bg-slate-900 text-blue-300 text-xs p-3 rounded border border-slate-700 focus:outline-none resize-none font-mono" placeholder="Generating secure code..."></textarea>
+                            <button onclick="copyToClipboard('host-offer-code')" class="absolute top-2 right-2 bg-slate-700 hover:bg-slate-600 p-2 rounded text-white text-xs transition z-10">
                                 <i class="ph ph-copy text-lg"></i>
                             </button>
                         </div>
-                        <p id="host-loading-msg" class="text-xs text-yellow-500 hidden"><i class="ph ph-spinner animate-spin"></i> Generating code...</p>
+                        <p id="host-loading-msg" class="text-xs text-yellow-500 flex items-center gap-2"><i class="ph ph-spinner animate-spin"></i> Generating code (this may take a few seconds)...</p>
 
-                        <button onclick="goToHostStep2()" class="w-full py-3 rounded-lg bg-slate-700 hover:bg-slate-600 font-medium transition text-sm flex items-center justify-center gap-2">
+                        <button onclick="goToHostStep2()" class="w-full py-4 rounded-lg bg-slate-700 hover:bg-slate-600 font-medium transition text-sm flex items-center justify-center gap-2 border border-slate-600">
                             <span>I have received the Answer Code</span>
                             <i class="ph-bold ph-arrow-right"></i>
                         </button>
@@ -119,11 +122,11 @@
                             <p class="text-xs text-slate-300">Paste the Answer Code you received back from your partner.</p>
                         </div>
                         
-                        <textarea id="host-answer-input" class="w-full h-24 bg-slate-900 text-emerald-300 text-xs p-3 rounded border border-slate-700 focus:outline-none focus:border-blue-500 resize-none font-mono" placeholder="Paste Answer Code here..."></textarea>
+                        <textarea id="host-answer-input" class="w-full h-28 bg-slate-900 text-emerald-300 text-xs p-3 rounded border border-slate-700 focus:outline-none focus:border-blue-500 resize-none font-mono" placeholder="Paste Answer Code here..."></textarea>
 
                         <div class="flex gap-3">
                             <button onclick="backToHostStep1()" class="px-4 py-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm">Back</button>
-                            <button onclick="hostVerifyAnswer()" class="flex-1 py-3 rounded-lg bg-blue-600 hover:bg-blue-500 font-bold transition shadow-lg shadow-blue-900/50 flex items-center justify-center gap-2">
+                            <button onclick="hostVerifyAnswer()" class="flex-1 py-3 rounded-lg bg-blue-600 hover:bg-blue-500 font-bold transition shadow-lg shadow-blue-900/50 flex items-center justify-center gap-2 text-white">
                                 <i class="ph-bold ph-plugs-connected"></i> Connect
                             </button>
                         </div>
@@ -136,12 +139,12 @@
                     <div id="join-step-1" class="space-y-4">
                         <div class="bg-emerald-900/30 p-3 rounded border border-emerald-800 mb-2">
                             <h3 class="font-bold text-emerald-400 text-sm">STEP 1: Paste Host Code</h3>
-                            <p class="text-xs text-slate-300">Paste the code the Host sent you to generate your answer.</p>
+                            <p class="text-xs text-slate-300">Paste the code the Host sent you.</p>
                         </div>
 
-                        <textarea id="join-offer-input" class="w-full h-24 bg-slate-900 text-blue-300 text-xs p-3 rounded border border-slate-700 focus:outline-none focus:border-emerald-500 resize-none font-mono" placeholder="Paste Host Code here..."></textarea>
+                        <textarea id="join-offer-input" class="w-full h-28 bg-slate-900 text-blue-300 text-xs p-3 rounded border border-slate-700 focus:outline-none focus:border-emerald-500 resize-none font-mono" placeholder="Paste Host Code here..."></textarea>
 
-                        <button onclick="joinGenerateAnswer()" class="w-full py-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 font-bold transition shadow-lg shadow-emerald-900/50 flex items-center justify-center gap-2">
+                        <button onclick="joinGenerateAnswer()" class="w-full py-4 rounded-lg bg-emerald-600 hover:bg-emerald-500 font-bold transition shadow-lg shadow-emerald-900/50 flex items-center justify-center gap-2 text-white">
                             <i class="ph-bold ph-gear"></i> Generate Answer Code
                         </button>
                     </div>
@@ -153,28 +156,28 @@
                             <p class="text-xs text-slate-300">Copy this code and send it back to the Host.</p>
                         </div>
 
-                        <div class="relative">
-                            <textarea id="join-answer-code" readonly class="w-full h-24 bg-slate-900 text-emerald-300 text-xs p-3 rounded border border-slate-700 focus:outline-none resize-none font-mono" placeholder="Generating answer..."></textarea>
-                            <button onclick="copyToClipboard('join-answer-code')" class="absolute top-2 right-2 bg-slate-700 hover:bg-slate-600 p-2 rounded text-white text-xs transition">
+                        <div class="relative group">
+                            <textarea id="join-answer-code" readonly onclick="this.select()" class="w-full h-28 bg-slate-900 text-emerald-300 text-xs p-3 rounded border border-slate-700 focus:outline-none resize-none font-mono" placeholder="Generating answer..."></textarea>
+                            <button onclick="copyToClipboard('join-answer-code')" class="absolute top-2 right-2 bg-slate-700 hover:bg-slate-600 p-2 rounded text-white text-xs transition z-10">
                                 <i class="ph ph-copy text-lg"></i>
                             </button>
                         </div>
-                        <p id="join-loading-msg" class="text-xs text-yellow-500 hidden"><i class="ph ph-spinner animate-spin"></i> Generating answer candidates...</p>
+                        <p id="join-loading-msg" class="text-xs text-yellow-500 flex items-center gap-2"><i class="ph ph-spinner animate-spin"></i> Generating answer...</p>
 
-                        <div class="text-center p-4 bg-slate-800/50 rounded-lg">
+                        <div class="text-center p-4 bg-slate-800/50 rounded-lg border border-slate-700">
                             <div class="animate-pulse flex justify-center mb-2">
                                 <i class="ph-fill ph-wifi-high text-2xl text-emerald-500"></i>
                             </div>
-                            <p class="text-sm font-medium">Waiting for Host to connect...</p>
-                            <p class="text-xs text-slate-500 mt-1">Once the Host pastes your code, the call will start automatically.</p>
+                            <p class="text-sm font-medium">Waiting for Host...</p>
+                            <p class="text-xs text-slate-500 mt-1">Send the code above to Host. Call starts automatically when they connect.</p>
                         </div>
                     </div>
                 </div>
 
             </div>
             
-            <div class="mt-4 text-center shrink-0 flex justify-center">
-                 <button onclick="resetSetup()" class="text-xs text-slate-500 hover:text-white flex items-center gap-1"><i class="ph ph-arrow-counter-clockwise"></i> Reset</button>
+            <div class="mt-4 text-center shrink-0 flex justify-center pb-2">
+                 <button onclick="resetSetup()" class="text-xs text-slate-500 hover:text-white flex items-center gap-1 p-2"><i class="ph ph-arrow-counter-clockwise"></i> Reset / Start Over</button>
             </div>
         </div>
     </div>
@@ -205,10 +208,6 @@
         <!-- Local Video (Draggable) -->
         <div id="local-video-container" class="rounded-xl overflow-hidden border-2 border-slate-700 bg-slate-800">
             <video id="local-video" autoplay playsinline muted class="w-full h-full object-cover transform scale-x-[-1]"></video>
-            <!-- Drag Handle -->
-            <div class="absolute top-0 left-0 w-full h-full hover:bg-white/10 transition-colors z-10 flex items-center justify-center opacity-0 hover:opacity-100 touch-none">
-                <i class="ph-fill ph-arrows-out-cardinal text-white text-2xl drop-shadow-md"></i>
-            </div>
         </div>
 
         <!-- Top Bar (Network & Info) -->
@@ -255,7 +254,7 @@
         </div>
 
         <!-- Bottom Controls -->
-        <div class="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex items-center gap-2 md:gap-3 z-40 glass p-2 rounded-2xl max-w-[90vw] overflow-x-auto no-scrollbar">
+        <div class="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex items-center gap-2 md:gap-3 z-40 glass p-2 rounded-2xl max-w-[95vw] overflow-x-auto no-scrollbar">
             <button onclick="toggleMic()" id="btn-mic" class="w-10 h-10 md:w-12 md:h-12 rounded-xl flex shrink-0 items-center justify-center bg-slate-800 hover:bg-slate-700 text-white transition tooltip">
                 <i class="ph-fill ph-microphone text-lg md:text-xl"></i>
             </button>
@@ -279,9 +278,9 @@
     </div>
 
     <!-- Toast Notification -->
-    <div id="toast" class="fixed top-20 left-1/2 transform -translate-x-1/2 bg-slate-800 border border-slate-700 text-white px-4 py-2 rounded-lg shadow-xl translate-y-[-200%] transition-transform duration-300 z-[60] flex items-center gap-2 max-w-[90vw] whitespace-nowrap overflow-hidden text-ellipsis">
-        <i class="ph-fill ph-info text-blue-400"></i>
-        <span id="toast-msg" class="text-sm">Notification</span>
+    <div id="toast" class="fixed top-12 left-1/2 transform -translate-x-1/2 bg-slate-800 border border-slate-700 text-white px-4 py-3 rounded-lg shadow-2xl translate-y-[-200%] transition-transform duration-300 z-[70] flex items-center gap-3 max-w-[90vw]">
+        <i class="ph-fill ph-info text-blue-400 text-xl"></i>
+        <span id="toast-msg" class="text-sm font-medium">Notification</span>
     </div>
 
     <!-- JS Logic -->
@@ -295,15 +294,15 @@
         let screenStream = null;
         let recognition = null;
         let isCaptionsOn = false;
+        let iceGatheringTimeout = null; // Important: Timeout fallback
 
-        // Expanded STUN Server List for better connectivity
+        // STUN Server List
         const servers = {
             iceServers: [
                 { urls: 'stun:stun.l.google.com:19302' },
                 { urls: 'stun:stun1.l.google.com:19302' },
                 { urls: 'stun:stun2.l.google.com:19302' },
                 { urls: 'stun:stun3.l.google.com:19302' },
-                { urls: 'stun:stun4.l.google.com:19302' },
                 { urls: 'stun:global.stun.twilio.com:3478' }
             ]
         };
@@ -318,18 +317,26 @@
         
         // 1. HOST FLOW
         async function startHosting() {
+            const mediaSuccess = await initMedia();
+            if (!mediaSuccess) return;
+
             isInitiator = true;
             document.getElementById('step-mode').classList.add('hidden');
             document.getElementById('host-flow').classList.remove('hidden');
             document.getElementById('host-step-1').classList.remove('hidden');
             document.getElementById('host-loading-msg').classList.remove('hidden');
             
-            await initMedia();
             createPeerConnection();
             createDataChannel();
             
-            const offer = await peerConnection.createOffer();
-            await peerConnection.setLocalDescription(offer);
+            try {
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
+                startIceTimeout(); // Fallback trigger
+            } catch(e) {
+                console.error(e);
+                showToast("Error creating offer");
+            }
         }
 
         function goToHostStep2() {
@@ -351,23 +358,25 @@
 
             try {
                 const decompressed = LZString.decompressFromBase64(answerCode);
+                if(!decompressed) throw new Error("Empty decomp");
                 const desc = JSON.parse(decompressed);
                 await peerConnection.setRemoteDescription(desc);
-                // Connection state change listener will trigger UI
             } catch(e) {
                 console.error(e);
-                showToast("Invalid Code. Please check.");
+                showToast("Invalid Code. Please Copy/Paste carefully.");
             }
         }
 
         // 2. JOIN FLOW
         async function startJoining() {
+            const mediaSuccess = await initMedia();
+            if (!mediaSuccess) return;
+
             isInitiator = false;
             document.getElementById('step-mode').classList.add('hidden');
             document.getElementById('join-flow').classList.remove('hidden');
             document.getElementById('join-step-1').classList.remove('hidden');
             
-            await initMedia();
             createPeerConnection();
         }
 
@@ -380,11 +389,13 @@
 
             try {
                 const decompressed = LZString.decompressFromBase64(offerCode);
+                if(!decompressed) throw new Error("Empty decomp");
                 const desc = JSON.parse(decompressed);
                 
                 await peerConnection.setRemoteDescription(desc);
                 const answer = await peerConnection.createAnswer();
                 await peerConnection.setLocalDescription(answer);
+                startIceTimeout(); // Fallback trigger
                 
                 // Move UI to step 2 immediately
                 document.getElementById('join-step-1').classList.add('hidden');
@@ -392,26 +403,27 @@
                 document.getElementById('join-loading-msg').classList.remove('hidden');
             } catch(e) {
                 console.error(e);
-                showToast("Invalid Host Code");
+                showToast("Invalid Host Code. Check for missing characters.");
             }
         }
 
-        // Initialize Camera/Mic
+        // Initialize Camera/Mic with Error Handling
         async function initMedia() {
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: 'user' }, 
-                    audio: true 
+                    video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, 
+                    audio: { echoCancellation: true, noiseSuppression: true } 
                 });
                 localVideo.srcObject = localStream;
-                showToast("Camera and Mic access granted");
+                return true;
             } catch (err) {
                 console.error("Error accessing media", err);
-                showToast("Error: Could not access Camera/Mic");
+                showToast("Camera/Mic blocked! Please allow access in settings.");
+                return false;
             }
         }
 
-        // Draggable Local Video (Mouse + Touch Support)
+        // Draggable Local Video Logic
         const dragItem = document.getElementById('local-video-container');
         let active = false;
         let currentX;
@@ -421,14 +433,13 @@
         let xOffset = 0;
         let yOffset = 0;
 
-        // Mouse Events
         dragItem.addEventListener("mousedown", dragStart, false);
-        document.addEventListener("mouseup", dragEnd, false);
-        document.addEventListener("mousemove", drag, false);
-
-        // Touch Events
         dragItem.addEventListener("touchstart", dragStart, {passive: false});
+
+        document.addEventListener("mouseup", dragEnd, false);
         document.addEventListener("touchend", dragEnd, false);
+
+        document.addEventListener("mousemove", drag, false);
         document.addEventListener("touchmove", drag, {passive: false});
 
         function dragStart(e) {
@@ -439,7 +450,6 @@
                 initialX = e.clientX - xOffset;
                 initialY = e.clientY - yOffset;
             }
-
             if (e.target === dragItem || dragItem.contains(e.target)) {
                 active = true;
             }
@@ -461,7 +471,6 @@
                     currentX = e.clientX - initialX;
                     currentY = e.clientY - initialY;
                 }
-
                 xOffset = currentX;
                 yOffset = currentY;
                 setTranslate(currentX, currentY, dragItem);
@@ -479,17 +488,7 @@
 
             peerConnection.onicecandidate = (event) => {
                 if (!event.candidate) {
-                    // ICE Gathering Complete
-                    const code = JSON.stringify(peerConnection.localDescription);
-                    const compressed = LZString.compressToBase64(code);
-                    
-                    if(isInitiator) {
-                        document.getElementById('host-offer-code').value = compressed;
-                        document.getElementById('host-loading-msg').classList.add('hidden');
-                    } else {
-                        document.getElementById('join-answer-code').value = compressed;
-                        document.getElementById('join-loading-msg').classList.add('hidden');
-                    }
+                    generateCodeNow(); // Finished gathering
                 }
             };
 
@@ -501,13 +500,13 @@
             peerConnection.onconnectionstatechange = () => {
                 const status = peerConnection.connectionState;
                 document.getElementById('connection-status').innerText = status.charAt(0).toUpperCase() + status.slice(1);
+                
                 if(status === 'connected') {
                      document.getElementById('connection-status').className = "text-xs font-mono text-green-400";
-                     startBitrateMonitor();
                      startCallUI();
-                } else if (status === 'disconnected') {
+                } else if (status === 'disconnected' || status === 'failed') {
                      document.getElementById('connection-status').className = "text-xs font-mono text-red-400";
-                     showToast("Peer disconnected");
+                     showToast("Connection Lost");
                 }
             };
 
@@ -516,9 +515,44 @@
                 setupDataChannel();
             };
 
-            localStream.getTracks().forEach(track => {
-                peerConnection.addTrack(track, localStream);
-            });
+            if(localStream) {
+                localStream.getTracks().forEach(track => {
+                    peerConnection.addTrack(track, localStream);
+                });
+            }
+        }
+
+        // IMPORTANT: Fallback if ICE gathering takes too long (common on mobile)
+        function startIceTimeout() {
+            if(iceGatheringTimeout) clearTimeout(iceGatheringTimeout);
+            iceGatheringTimeout = setTimeout(() => {
+                console.log("Forcing code generation after timeout...");
+                generateCodeNow();
+            }, 2500); // Wait 2.5s max for candidates
+        }
+
+        function generateCodeNow() {
+            if(iceGatheringTimeout) clearTimeout(iceGatheringTimeout);
+            
+            // Only generate if we have a description
+            if(!peerConnection.localDescription) return;
+
+            const code = JSON.stringify(peerConnection.localDescription);
+            const compressed = LZString.compressToBase64(code);
+            
+            if(isInitiator) {
+                const el = document.getElementById('host-offer-code');
+                if(el.value === "") { // Only update if empty
+                    el.value = compressed;
+                    document.getElementById('host-loading-msg').classList.add('hidden');
+                }
+            } else {
+                const el = document.getElementById('join-answer-code');
+                if(el.value === "") {
+                    el.value = compressed;
+                    document.getElementById('join-loading-msg').classList.add('hidden');
+                }
+            }
         }
 
         function createDataChannel() {
@@ -527,7 +561,7 @@
         }
 
         function setupDataChannel() {
-            dataChannel.onopen = () => showToast("Secure Data Channel Open");
+            dataChannel.onopen = () => showToast("Chat connected!");
             dataChannel.onmessage = handleDataMessage;
         }
 
@@ -539,7 +573,6 @@
 
         // --- Features ---
 
-        // 1. Chat
         function toggleChat() {
             const panel = document.getElementById('chat-panel');
             const isHidden = panel.classList.contains('translate-x-full');
@@ -588,7 +621,6 @@
             }
         }
 
-        // 2. File Sharing
         function sendFile() {
             const fileInput = document.getElementById('file-input');
             const file = fileInput.files[0];
@@ -596,14 +628,13 @@
 
             const reader = new FileReader();
             reader.onload = (e) => {
-                const buffer = e.target.result;
                 dataChannel.send(JSON.stringify({ 
                     type: 'file-meta', 
                     name: file.name, 
                     size: file.size, 
                     mime: file.type 
                 }));
-                showToast("File sending started (Simulated)");
+                showToast("File sharing started (Simulated)");
             }
             reader.readAsDataURL(file);
         }
@@ -619,7 +650,6 @@
             } catch (e) { }
         }
 
-        // 3. Captions
         function toggleCaptions() {
             isCaptionsOn = !isCaptionsOn;
             const btn = document.getElementById('btn-caption');
@@ -654,11 +684,7 @@
                         }
                     }
                 };
-                try {
-                    recognition.start();
-                } catch(e) { console.log("Recognition already started"); }
-            } else {
-                console.log("Speech Recognition not supported in this browser");
+                try { recognition.start(); } catch(e) {}
             }
         }
 
@@ -673,7 +699,6 @@
             }, 4000);
         }
 
-        // 4. Screen Sharing
         async function toggleScreen() {
             if (!screenStream) {
                 try {
@@ -681,13 +706,11 @@
                     const screenTrack = screenStream.getVideoTracks()[0];
                     const sender = peerConnection.getSenders().find(s => s.track.kind === 'video');
                     if(sender) sender.replaceTrack(screenTrack);
-                    
                     localVideo.srcObject = screenStream;
                     document.getElementById('btn-screen').classList.replace('bg-slate-800', 'bg-blue-600');
-                    
                     screenTrack.onended = () => toggleScreen();
                 } catch (err) {
-                    console.error("Error sharing screen", err);
+                    console.error(err);
                 }
             } else {
                 screenStream.getTracks().forEach(track => track.stop());
@@ -700,7 +723,6 @@
             }
         }
 
-        // 5. Controls
         function toggleMic() {
             const track = localStream.getAudioTracks()[0];
             track.enabled = !track.enabled;
@@ -744,12 +766,26 @@
             window.location.reload();
         }
 
-        // Utils
-        function copyToClipboard(id) {
+        async function copyToClipboard(id) {
             const el = document.getElementById(id);
+            const text = el.value;
+            
+            // Modern API attempt
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                try {
+                    await navigator.clipboard.writeText(text);
+                    showToast("Code copied to clipboard!");
+                    el.select();
+                    return;
+                } catch (err) {
+                    console.warn("Clipboard API failed, falling back", err);
+                }
+            }
+
+            // Fallback
             el.select();
             document.execCommand('copy');
-            showToast("Code copied!");
+            showToast("Code copied! (Manual selection)");
         }
 
         function showToast(msg) {
@@ -763,14 +799,6 @@
         
         function resetSetup() {
             window.location.reload();
-        }
-
-        function startBitrateMonitor() {
-            setInterval(async () => {
-                if(!peerConnection) return;
-                const bars = document.querySelectorAll('#network-indicator div');
-                bars.forEach(b => b.classList.add('bg-green-500'));
-            }, 2000);
         }
     </script>
 </body>
