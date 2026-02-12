@@ -75,53 +75,106 @@
             </div>
 
             <div class="overflow-y-auto custom-scrollbar grow">
-                <!-- Step 1: Mode Selection -->
+                <!-- Step 0: Mode Selection -->
                 <div id="step-mode" class="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
                     <button onclick="startHosting()" class="group flex flex-col items-center justify-center p-6 rounded-xl bg-slate-800 hover:bg-blue-600 transition-all border border-slate-700 hover:border-blue-400 min-h-[160px]">
                         <i class="ph ph-plus-circle text-5xl mb-4 text-blue-400 group-hover:text-white"></i>
                         <h3 class="text-xl font-semibold">Start New Call</h3>
-                        <p class="text-xs text-slate-400 mt-2 group-hover:text-blue-100">Generate a code to share</p>
+                        <p class="text-xs text-slate-400 mt-2 group-hover:text-blue-100">I want to host a call</p>
                     </button>
                     <button onclick="startJoining()" class="group flex flex-col items-center justify-center p-6 rounded-xl bg-slate-800 hover:bg-emerald-600 transition-all border border-slate-700 hover:border-emerald-400 min-h-[160px]">
                         <i class="ph ph-arrow-circle-right text-5xl mb-4 text-emerald-400 group-hover:text-white"></i>
                         <h3 class="text-xl font-semibold">Join Call</h3>
-                        <p class="text-xs text-slate-400 mt-2 group-hover:text-emerald-100">Paste code from a friend</p>
+                        <p class="text-xs text-slate-400 mt-2 group-hover:text-emerald-100">I have a code to join</p>
                     </button>
                 </div>
 
-                <!-- Step 2: Connection Logic -->
-                <div id="step-connect" class="hidden space-y-4">
-                    <div class="bg-slate-800/50 p-4 rounded-lg border border-slate-700">
-                        <label class="block text-xs font-uppercase text-slate-400 mb-2 font-bold tracking-wider">
-                            1. YOUR CONNECTION CODE (COPY THIS)
-                        </label>
+                <!-- HOST FLOW -->
+                <div id="host-flow" class="hidden h-full flex flex-col">
+                    <!-- Host Step 1: Generate & Share -->
+                    <div id="host-step-1" class="space-y-4">
+                        <div class="bg-blue-900/30 p-3 rounded border border-blue-800 mb-2">
+                            <h3 class="font-bold text-blue-400 text-sm">STEP 1: Share Your Code</h3>
+                            <p class="text-xs text-slate-300">Copy this code and send it to your partner.</p>
+                        </div>
+                        
                         <div class="relative">
-                            <textarea id="local-code" readonly class="w-full h-20 bg-slate-900 text-blue-300 text-xs p-3 rounded border border-slate-700 focus:outline-none resize-none font-mono" placeholder="Generating secure code... please wait..."></textarea>
-                            <button onclick="copyToClipboard('local-code')" class="absolute top-2 right-2 bg-slate-700 hover:bg-slate-600 p-2 rounded text-white text-xs transition">
+                            <textarea id="host-offer-code" readonly class="w-full h-24 bg-slate-900 text-blue-300 text-xs p-3 rounded border border-slate-700 focus:outline-none resize-none font-mono" placeholder="Generating secure code..."></textarea>
+                            <button onclick="copyToClipboard('host-offer-code')" class="absolute top-2 right-2 bg-slate-700 hover:bg-slate-600 p-2 rounded text-white text-xs transition">
                                 <i class="ph ph-copy text-lg"></i>
                             </button>
                         </div>
-                        <p id="loading-msg" class="text-xs text-yellow-500 mt-1 hidden"><i class="ph ph-spinner animate-spin"></i> Gathering network candidates... Code will appear shortly.</p>
-                    </div>
+                        <p id="host-loading-msg" class="text-xs text-yellow-500 hidden"><i class="ph ph-spinner animate-spin"></i> Generating code...</p>
 
-                    <div class="bg-slate-800/50 p-4 rounded-lg border border-slate-700">
-                        <label class="block text-xs font-uppercase text-slate-400 mb-2 font-bold tracking-wider">
-                            2. PARTNER'S CODE (PASTE HERE)
-                        </label>
-                        <textarea id="remote-code" class="w-full h-20 bg-slate-900 text-emerald-300 text-xs p-3 rounded border border-slate-700 focus:outline-none focus:border-blue-500 resize-none font-mono" placeholder="Paste the code you received here..."></textarea>
-                    </div>
-
-                    <div class="flex gap-3 pt-2">
-                        <button onclick="resetSetup()" class="px-6 py-3 rounded-lg bg-slate-700 hover:bg-slate-600 font-medium transition text-sm">Back</button>
-                        <button id="connect-btn" onclick="finishConnection()" class="flex-1 px-6 py-3 rounded-lg bg-blue-600 hover:bg-blue-500 font-bold transition shadow-lg shadow-blue-900/50 flex items-center justify-center gap-2">
-                            <i class="ph-bold ph-plugs-connected"></i> Connect
+                        <button onclick="goToHostStep2()" class="w-full py-3 rounded-lg bg-slate-700 hover:bg-slate-600 font-medium transition text-sm flex items-center justify-center gap-2">
+                            <span>I have received the Answer Code</span>
+                            <i class="ph-bold ph-arrow-right"></i>
                         </button>
                     </div>
+
+                    <!-- Host Step 2: Input Answer -->
+                    <div id="host-step-2" class="hidden space-y-4">
+                        <div class="bg-blue-900/30 p-3 rounded border border-blue-800 mb-2">
+                            <h3 class="font-bold text-blue-400 text-sm">STEP 2: Connect</h3>
+                            <p class="text-xs text-slate-300">Paste the Answer Code you received back from your partner.</p>
+                        </div>
+                        
+                        <textarea id="host-answer-input" class="w-full h-24 bg-slate-900 text-emerald-300 text-xs p-3 rounded border border-slate-700 focus:outline-none focus:border-blue-500 resize-none font-mono" placeholder="Paste Answer Code here..."></textarea>
+
+                        <div class="flex gap-3">
+                            <button onclick="backToHostStep1()" class="px-4 py-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm">Back</button>
+                            <button onclick="hostVerifyAnswer()" class="flex-1 py-3 rounded-lg bg-blue-600 hover:bg-blue-500 font-bold transition shadow-lg shadow-blue-900/50 flex items-center justify-center gap-2">
+                                <i class="ph-bold ph-plugs-connected"></i> Connect
+                            </button>
+                        </div>
+                    </div>
                 </div>
+
+                <!-- JOIN FLOW -->
+                <div id="join-flow" class="hidden h-full flex flex-col">
+                    <!-- Join Step 1: Input Offer -->
+                    <div id="join-step-1" class="space-y-4">
+                        <div class="bg-emerald-900/30 p-3 rounded border border-emerald-800 mb-2">
+                            <h3 class="font-bold text-emerald-400 text-sm">STEP 1: Paste Host Code</h3>
+                            <p class="text-xs text-slate-300">Paste the code the Host sent you to generate your answer.</p>
+                        </div>
+
+                        <textarea id="join-offer-input" class="w-full h-24 bg-slate-900 text-blue-300 text-xs p-3 rounded border border-slate-700 focus:outline-none focus:border-emerald-500 resize-none font-mono" placeholder="Paste Host Code here..."></textarea>
+
+                        <button onclick="joinGenerateAnswer()" class="w-full py-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 font-bold transition shadow-lg shadow-emerald-900/50 flex items-center justify-center gap-2">
+                            <i class="ph-bold ph-gear"></i> Generate Answer Code
+                        </button>
+                    </div>
+
+                    <!-- Join Step 2: Share Answer -->
+                    <div id="join-step-2" class="hidden space-y-4">
+                        <div class="bg-emerald-900/30 p-3 rounded border border-emerald-800 mb-2">
+                            <h3 class="font-bold text-emerald-400 text-sm">STEP 2: Share Answer</h3>
+                            <p class="text-xs text-slate-300">Copy this code and send it back to the Host.</p>
+                        </div>
+
+                        <div class="relative">
+                            <textarea id="join-answer-code" readonly class="w-full h-24 bg-slate-900 text-emerald-300 text-xs p-3 rounded border border-slate-700 focus:outline-none resize-none font-mono" placeholder="Generating answer..."></textarea>
+                            <button onclick="copyToClipboard('join-answer-code')" class="absolute top-2 right-2 bg-slate-700 hover:bg-slate-600 p-2 rounded text-white text-xs transition">
+                                <i class="ph ph-copy text-lg"></i>
+                            </button>
+                        </div>
+                        <p id="join-loading-msg" class="text-xs text-yellow-500 hidden"><i class="ph ph-spinner animate-spin"></i> Generating answer candidates...</p>
+
+                        <div class="text-center p-4 bg-slate-800/50 rounded-lg">
+                            <div class="animate-pulse flex justify-center mb-2">
+                                <i class="ph-fill ph-wifi-high text-2xl text-emerald-500"></i>
+                            </div>
+                            <p class="text-sm font-medium">Waiting for Host to connect...</p>
+                            <p class="text-xs text-slate-500 mt-1">Once the Host pastes your code, the call will start automatically.</p>
+                        </div>
+                    </div>
+                </div>
+
             </div>
             
-            <div class="mt-4 text-center shrink-0">
-                <p class="text-[10px] text-slate-500">No data is sent to any server. Your connection is strictly Peer-to-Peer.</p>
+            <div class="mt-4 text-center shrink-0 flex justify-center">
+                 <button onclick="resetSetup()" class="text-xs text-slate-500 hover:text-white flex items-center gap-1"><i class="ph ph-arrow-counter-clockwise"></i> Reset</button>
             </div>
         </div>
     </div>
@@ -260,35 +313,87 @@
         const remoteVideo = document.getElementById('remote-video');
         const setupScreen = document.getElementById('setup-screen');
         const appUi = document.getElementById('app-ui');
-        const localCodeArea = document.getElementById('local-code');
-        const remoteCodeArea = document.getElementById('remote-code');
-        const loadingMsg = document.getElementById('loading-msg');
         
         // --- UI Functions ---
         
-        // Mode Selection
+        // 1. HOST FLOW
         async function startHosting() {
             isInitiator = true;
             document.getElementById('step-mode').classList.add('hidden');
-            document.getElementById('step-connect').classList.remove('hidden');
-            document.getElementById('connect-btn').innerText = "Verify Answer";
-            loadingMsg.classList.remove('hidden');
+            document.getElementById('host-flow').classList.remove('hidden');
+            document.getElementById('host-step-1').classList.remove('hidden');
+            document.getElementById('host-loading-msg').classList.remove('hidden');
+            
             await initMedia();
             createPeerConnection();
-            createDataChannel(); // Host creates data channel
+            createDataChannel();
             
             const offer = await peerConnection.createOffer();
             await peerConnection.setLocalDescription(offer);
         }
 
+        function goToHostStep2() {
+            document.getElementById('host-step-1').classList.add('hidden');
+            document.getElementById('host-step-2').classList.remove('hidden');
+        }
+
+        function backToHostStep1() {
+            document.getElementById('host-step-2').classList.add('hidden');
+            document.getElementById('host-step-1').classList.remove('hidden');
+        }
+
+        async function hostVerifyAnswer() {
+            const answerCode = document.getElementById('host-answer-input').value.trim();
+            if(!answerCode) {
+                showToast("Please paste the Answer Code first");
+                return;
+            }
+
+            try {
+                const decompressed = LZString.decompressFromBase64(answerCode);
+                const desc = JSON.parse(decompressed);
+                await peerConnection.setRemoteDescription(desc);
+                // Connection state change listener will trigger UI
+            } catch(e) {
+                console.error(e);
+                showToast("Invalid Code. Please check.");
+            }
+        }
+
+        // 2. JOIN FLOW
         async function startJoining() {
             isInitiator = false;
             document.getElementById('step-mode').classList.add('hidden');
-            document.getElementById('step-connect').classList.remove('hidden');
-            document.getElementById('connect-btn').innerText = "Join Call";
-            localCodeArea.placeholder = "Your Answer Code will appear here after you paste the host code and click Join.";
+            document.getElementById('join-flow').classList.remove('hidden');
+            document.getElementById('join-step-1').classList.remove('hidden');
+            
             await initMedia();
             createPeerConnection();
+        }
+
+        async function joinGenerateAnswer() {
+            const offerCode = document.getElementById('join-offer-input').value.trim();
+            if(!offerCode) {
+                showToast("Please paste the Host Code first");
+                return;
+            }
+
+            try {
+                const decompressed = LZString.decompressFromBase64(offerCode);
+                const desc = JSON.parse(decompressed);
+                
+                await peerConnection.setRemoteDescription(desc);
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+                
+                // Move UI to step 2 immediately
+                document.getElementById('join-step-1').classList.add('hidden');
+                document.getElementById('join-step-2').classList.remove('hidden');
+                document.getElementById('join-loading-msg').classList.remove('hidden');
+            } catch(e) {
+                console.error(e);
+                showToast("Invalid Host Code");
+            }
         }
 
         // Initialize Camera/Mic
@@ -374,11 +479,17 @@
 
             peerConnection.onicecandidate = (event) => {
                 if (!event.candidate) {
-                    // Gathering complete
-                    loadingMsg.classList.add('hidden');
+                    // ICE Gathering Complete
                     const code = JSON.stringify(peerConnection.localDescription);
                     const compressed = LZString.compressToBase64(code);
-                    localCodeArea.value = compressed;
+                    
+                    if(isInitiator) {
+                        document.getElementById('host-offer-code').value = compressed;
+                        document.getElementById('host-loading-msg').classList.add('hidden');
+                    } else {
+                        document.getElementById('join-answer-code').value = compressed;
+                        document.getElementById('join-loading-msg').classList.add('hidden');
+                    }
                 }
             };
 
@@ -419,42 +530,6 @@
             dataChannel.onopen = () => showToast("Secure Data Channel Open");
             dataChannel.onmessage = handleDataMessage;
         }
-
-        // Handling the "Connect" button logic
-        async function finishConnection() {
-            const remoteVal = remoteCodeArea.value.trim();
-            if (!remoteVal) {
-                showToast("Please paste the partner's code first!");
-                return;
-            }
-
-            try {
-                const decompressed = LZString.decompressFromBase64(remoteVal);
-                const desc = JSON.parse(decompressed);
-
-                if (isInitiator) {
-                    await peerConnection.setRemoteDescription(desc);
-                } else {
-                    await peerConnection.setRemoteDescription(desc);
-                    const answer = await peerConnection.createAnswer();
-                    await peerConnection.setLocalDescription(answer);
-                }
-            } catch (e) {
-                console.error(e);
-                showToast("Invalid Code. Please check and try again.");
-            }
-        }
-        
-        // Special listener for Joiner
-        setInterval(() => {
-            if(!isInitiator && peerConnection && peerConnection.iceGatheringState === 'complete' && localCodeArea.value === "") {
-                const code = JSON.stringify(peerConnection.localDescription);
-                const compressed = LZString.compressToBase64(code);
-                localCodeArea.value = compressed;
-                loadingMsg.classList.add('hidden');
-                showToast("Answer Code generated! Copy it and send to Host.");
-            }
-        }, 500);
 
         function startCallUI() {
             setupScreen.classList.add('hidden');
