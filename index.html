@@ -46,7 +46,7 @@
 
         /* Glassmorphism */
         .glass {
-            background: rgba(30, 41, 59, 0.8);
+            background: rgba(30, 41, 59, 0.85);
             backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
@@ -98,16 +98,16 @@
                     <div id="host-step-1" class="space-y-4">
                         <div class="bg-blue-900/30 p-3 rounded border border-blue-800 mb-2">
                             <h3 class="font-bold text-blue-400 text-sm">STEP 1: Share Your Code</h3>
-                            <p class="text-xs text-slate-300">Wait for code generation, then send it to your partner.</p>
+                            <p class="text-xs text-slate-300">Wait for code to generate, then copy and send to your partner.</p>
                         </div>
                         
                         <div class="relative group">
-                            <textarea id="host-offer-code" readonly onclick="this.select()" class="w-full h-28 bg-slate-900 text-blue-300 text-xs p-3 rounded border border-slate-700 focus:outline-none resize-none font-mono" placeholder="Generating secure code..."></textarea>
+                            <textarea id="host-offer-code" readonly onclick="this.select()" class="w-full h-28 bg-slate-900 text-blue-300 text-xs p-3 rounded border border-slate-700 focus:outline-none resize-none font-mono" placeholder="Initializing..."></textarea>
                             <button onclick="copyToClipboard('host-offer-code')" class="absolute top-2 right-2 bg-slate-700 hover:bg-slate-600 p-2 rounded text-white text-xs transition z-10">
                                 <i class="ph ph-copy text-lg"></i>
                             </button>
                         </div>
-                        <p id="host-loading-msg" class="text-xs text-yellow-500 flex items-center gap-2"><i class="ph ph-spinner animate-spin"></i> Generating code (this may take a few seconds)...</p>
+                        <p id="host-loading-msg" class="text-xs text-yellow-500 flex items-center gap-2"><i class="ph ph-spinner animate-spin"></i> Finding best network path...</p>
 
                         <button onclick="goToHostStep2()" class="w-full py-4 rounded-lg bg-slate-700 hover:bg-slate-600 font-medium transition text-sm flex items-center justify-center gap-2 border border-slate-600">
                             <span>I have received the Answer Code</span>
@@ -162,7 +162,7 @@
                                 <i class="ph ph-copy text-lg"></i>
                             </button>
                         </div>
-                        <p id="join-loading-msg" class="text-xs text-yellow-500 flex items-center gap-2"><i class="ph ph-spinner animate-spin"></i> Generating answer...</p>
+                        <p id="join-loading-msg" class="text-xs text-yellow-500 flex items-center gap-2"><i class="ph ph-spinner animate-spin"></i> Optimizing connection...</p>
 
                         <div class="text-center p-4 bg-slate-800/50 rounded-lg border border-slate-700">
                             <div class="animate-pulse flex justify-center mb-2">
@@ -213,13 +213,13 @@
         <!-- Top Bar (Network & Info) -->
         <div class="absolute top-0 left-0 w-full p-4 flex justify-between items-start z-40 bg-gradient-to-b from-black/80 to-transparent pointer-events-none">
             <div class="glass px-3 py-1.5 rounded-full flex items-center gap-2 pointer-events-auto">
-                <div id="network-indicator" class="flex gap-0.5 items-end h-3">
-                    <div class="w-1 bg-green-500 h-[40%] rounded-sm"></div>
-                    <div class="w-1 bg-green-500 h-[60%] rounded-sm"></div>
-                    <div class="w-1 bg-green-500 h-[80%] rounded-sm"></div>
-                    <div class="w-1 bg-green-500 h-[100%] rounded-sm"></div>
+                <div id="network-indicator" class="flex gap-0.5 items-end h-3" title="Network Strength">
+                    <div class="w-1 h-[40%] rounded-sm bg-slate-600 transition-colors duration-300"></div>
+                    <div class="w-1 h-[60%] rounded-sm bg-slate-600 transition-colors duration-300"></div>
+                    <div class="w-1 h-[80%] rounded-sm bg-slate-600 transition-colors duration-300"></div>
+                    <div class="w-1 h-[100%] rounded-sm bg-slate-600 transition-colors duration-300"></div>
                 </div>
-                <span id="connection-status" class="text-xs font-mono text-green-400">Connected</span>
+                <span id="connection-status" class="text-xs font-mono text-green-400 min-w-[50px] text-center">Ready</span>
             </div>
             
             <button onclick="toggleChat()" class="pointer-events-auto glass w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/10 transition relative">
@@ -261,7 +261,7 @@
             <button onclick="toggleCam()" id="btn-cam" class="w-10 h-10 md:w-12 md:h-12 rounded-xl flex shrink-0 items-center justify-center bg-slate-800 hover:bg-slate-700 text-white transition">
                 <i class="ph-fill ph-video-camera text-lg md:text-xl"></i>
             </button>
-            <button onclick="toggleScreen()" id="btn-screen" class="w-10 h-10 md:w-12 md:h-12 rounded-xl flex shrink-0 items-center justify-center bg-slate-800 hover:bg-slate-700 text-white transition hidden md:flex">
+            <button onclick="toggleScreen()" id="btn-screen" class="w-10 h-10 md:w-12 md:h-12 rounded-xl flex shrink-0 items-center justify-center bg-slate-800 hover:bg-slate-700 text-white transition hidden md:flex" title="Share Screen">
                 <i class="ph-fill ph-screencast text-lg md:text-xl"></i>
             </button>
             <button onclick="toggleCaptions()" id="btn-caption" class="w-10 h-10 md:w-12 md:h-12 rounded-xl flex shrink-0 items-center justify-center bg-slate-800 hover:bg-slate-700 text-white transition">
@@ -294,15 +294,17 @@
         let screenStream = null;
         let recognition = null;
         let isCaptionsOn = false;
-        let iceGatheringTimeout = null; // Important: Timeout fallback
+        let iceGatheringTimeout = null;
+        let bitrateInterval = null;
 
-        // STUN Server List
+        // Expanded STUN List for maximum connectivity
         const servers = {
             iceServers: [
                 { urls: 'stun:stun.l.google.com:19302' },
                 { urls: 'stun:stun1.l.google.com:19302' },
                 { urls: 'stun:stun2.l.google.com:19302' },
                 { urls: 'stun:stun3.l.google.com:19302' },
+                { urls: 'stun:stun4.l.google.com:19302' },
                 { urls: 'stun:global.stun.twilio.com:3478' }
             ]
         };
@@ -332,7 +334,9 @@
             try {
                 const offer = await peerConnection.createOffer();
                 await peerConnection.setLocalDescription(offer);
-                startIceTimeout(); // Fallback trigger
+                // Wait for candidates (auto-triggers in onicecandidate)
+                // Start a failsafe timeout for slow networks
+                startIceTimeout();
             } catch(e) {
                 console.error(e);
                 showToast("Error creating offer");
@@ -395,9 +399,9 @@
                 await peerConnection.setRemoteDescription(desc);
                 const answer = await peerConnection.createAnswer();
                 await peerConnection.setLocalDescription(answer);
-                startIceTimeout(); // Fallback trigger
                 
-                // Move UI to step 2 immediately
+                startIceTimeout();
+                
                 document.getElementById('join-step-1').classList.add('hidden');
                 document.getElementById('join-step-2').classList.remove('hidden');
                 document.getElementById('join-loading-msg').classList.remove('hidden');
@@ -407,7 +411,7 @@
             }
         }
 
-        // Initialize Camera/Mic with Error Handling
+        // Initialize Camera/Mic
         async function initMedia() {
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ 
@@ -423,7 +427,7 @@
             }
         }
 
-        // Draggable Local Video Logic
+        // Draggable Logic
         const dragItem = document.getElementById('local-video-container');
         let active = false;
         let currentX;
@@ -435,10 +439,8 @@
 
         dragItem.addEventListener("mousedown", dragStart, false);
         dragItem.addEventListener("touchstart", dragStart, {passive: false});
-
         document.addEventListener("mouseup", dragEnd, false);
         document.addEventListener("touchend", dragEnd, false);
-
         document.addEventListener("mousemove", drag, false);
         document.addEventListener("touchmove", drag, {passive: false});
 
@@ -454,13 +456,11 @@
                 active = true;
             }
         }
-
         function dragEnd(e) {
             initialX = currentX;
             initialY = currentY;
             active = false;
         }
-
         function drag(e) {
             if (active) {
                 e.preventDefault();
@@ -476,7 +476,6 @@
                 setTranslate(currentX, currentY, dragItem);
             }
         }
-
         function setTranslate(xPos, yPos, el) {
             el.style.transform = "translate3d(" + xPos + "px, " + yPos + "px, 0)";
         }
@@ -488,7 +487,8 @@
 
             peerConnection.onicecandidate = (event) => {
                 if (!event.candidate) {
-                    generateCodeNow(); // Finished gathering
+                    // Gathering complete
+                    generateCodeNow(); 
                 }
             };
 
@@ -499,14 +499,20 @@
 
             peerConnection.onconnectionstatechange = () => {
                 const status = peerConnection.connectionState;
-                document.getElementById('connection-status').innerText = status.charAt(0).toUpperCase() + status.slice(1);
+                const statusEl = document.getElementById('connection-status');
                 
                 if(status === 'connected') {
-                     document.getElementById('connection-status').className = "text-xs font-mono text-green-400";
+                     statusEl.innerText = "Connected";
+                     statusEl.className = "text-xs font-mono text-green-400 min-w-[50px] text-center";
                      startCallUI();
+                     startNetworkMonitor();
                 } else if (status === 'disconnected' || status === 'failed') {
-                     document.getElementById('connection-status').className = "text-xs font-mono text-red-400";
+                     statusEl.innerText = "Offline";
+                     statusEl.className = "text-xs font-mono text-red-400 min-w-[50px] text-center";
                      showToast("Connection Lost");
+                     stopNetworkMonitor();
+                } else {
+                     statusEl.innerText = status.charAt(0).toUpperCase() + status.slice(1);
                 }
             };
 
@@ -522,36 +528,35 @@
             }
         }
 
-        // IMPORTANT: Fallback if ICE gathering takes too long (common on mobile)
         function startIceTimeout() {
             if(iceGatheringTimeout) clearTimeout(iceGatheringTimeout);
+            // Increased timeout to 4 seconds to give slow networks time to find path
             iceGatheringTimeout = setTimeout(() => {
-                console.log("Forcing code generation after timeout...");
+                console.log("Forcing code generation (timeout).");
                 generateCodeNow();
-            }, 2500); // Wait 2.5s max for candidates
+            }, 4000); 
         }
 
         function generateCodeNow() {
             if(iceGatheringTimeout) clearTimeout(iceGatheringTimeout);
             
-            // Only generate if we have a description
-            if(!peerConnection.localDescription) return;
+            // Safety check
+            if(!peerConnection || !peerConnection.localDescription) return;
 
             const code = JSON.stringify(peerConnection.localDescription);
             const compressed = LZString.compressToBase64(code);
             
             if(isInitiator) {
                 const el = document.getElementById('host-offer-code');
-                if(el.value === "") { // Only update if empty
-                    el.value = compressed;
-                    document.getElementById('host-loading-msg').classList.add('hidden');
-                }
+                // Allow overwrite to ensure we have the most complete code
+                el.value = compressed;
+                document.getElementById('host-loading-msg').innerText = "Code Ready! Copy and Share.";
+                document.getElementById('host-loading-msg').className = "text-xs text-green-400 flex items-center gap-2 font-bold";
             } else {
                 const el = document.getElementById('join-answer-code');
-                if(el.value === "") {
-                    el.value = compressed;
-                    document.getElementById('join-loading-msg').classList.add('hidden');
-                }
+                el.value = compressed;
+                document.getElementById('join-loading-msg').innerText = "Answer Ready! Copy and Share.";
+                document.getElementById('join-loading-msg').className = "text-xs text-green-400 flex items-center gap-2 font-bold";
             }
         }
 
@@ -572,6 +577,52 @@
         }
 
         // --- Features ---
+
+        function startNetworkMonitor() {
+            if(bitrateInterval) clearInterval(bitrateInterval);
+            bitrateInterval = setInterval(async () => {
+                if(!peerConnection) return;
+                try {
+                    const stats = await peerConnection.getStats(null);
+                    let rtt = 0;
+                    
+                    stats.forEach(report => {
+                        if (report.type === 'candidate-pair' && report.state === 'succeeded' && report.currentRoundTripTime) {
+                            rtt = report.currentRoundTripTime * 1000;
+                        }
+                    });
+
+                    const bars = document.querySelectorAll('#network-indicator div');
+                    let strength = 0;
+                    
+                    if (rtt > 0) {
+                        if (rtt < 100) strength = 4;
+                        else if (rtt < 250) strength = 3;
+                        else if (rtt < 500) strength = 2;
+                        else strength = 1;
+                        document.getElementById('connection-status').innerText = `${Math.round(rtt)}ms`;
+                    } else {
+                        document.getElementById('connection-status').innerText = "Conn...";
+                    }
+
+                    bars.forEach((b, i) => {
+                        b.classList.remove('bg-green-500', 'bg-yellow-500', 'bg-red-500', 'bg-slate-600');
+                        if (i < strength) {
+                             if(strength === 4) b.classList.add('bg-green-500');
+                             else if(strength === 3) b.classList.add('bg-green-500');
+                             else if(strength === 2) b.classList.add('bg-yellow-500');
+                             else b.classList.add('bg-red-500');
+                        } else {
+                            b.classList.add('bg-slate-600');
+                        }
+                    });
+                } catch(e) {}
+            }, 2000);
+        }
+
+        function stopNetworkMonitor() {
+            if(bitrateInterval) clearInterval(bitrateInterval);
+        }
 
         function toggleChat() {
             const panel = document.getElementById('chat-panel');
@@ -657,8 +708,13 @@
             btn.classList.toggle('bg-slate-800', !isCaptionsOn);
             
             const overlay = document.getElementById('caption-container');
-            if(isCaptionsOn) overlay.classList.remove('hidden');
-            else overlay.classList.add('hidden');
+            if(isCaptionsOn) {
+                overlay.classList.remove('hidden');
+                if (recognition) { try { recognition.start(); } catch(e){} }
+            } else {
+                overlay.classList.add('hidden');
+                if (recognition) { try { recognition.stop(); } catch(e){} }
+            }
             
             showToast(isCaptionsOn ? "Captions Enabled" : "Captions Disabled");
         }
@@ -666,26 +722,34 @@
         function startSpeechRecognition() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             
-            if (SpeechRecognition) {
-                recognition = new SpeechRecognition();
-                recognition.continuous = true;
-                recognition.interimResults = true;
-                recognition.lang = 'en-US';
-
-                recognition.onresult = (event) => {
-                    let interimTranscript = '';
-                    for (let i = event.resultIndex; i < event.results.length; ++i) {
-                        if (event.results[i].isFinal) {
-                            const text = event.results[i][0].transcript;
-                            if (dataChannel && dataChannel.readyState === 'open') {
-                                dataChannel.send(JSON.stringify({ type: 'caption', content: text }));
-                            }
-                            if(isCaptionsOn) showCaption(text);
-                        }
-                    }
-                };
-                try { recognition.start(); } catch(e) {}
+            if (!SpeechRecognition) {
+                console.log("Speech Recognition not supported");
+                return;
             }
+
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = 'en-US';
+
+            recognition.onresult = (event) => {
+                let interimTranscript = '';
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        const text = event.results[i][0].transcript;
+                        if (dataChannel && dataChannel.readyState === 'open') {
+                            dataChannel.send(JSON.stringify({ type: 'caption', content: text }));
+                        }
+                        if(isCaptionsOn) showCaption(text);
+                    }
+                }
+            };
+            
+            recognition.onend = () => {
+                if (isCaptionsOn) {
+                    try { recognition.start(); } catch(e) {}
+                }
+            };
         }
 
         let captionTimeout;
@@ -700,27 +764,60 @@
         }
 
         async function toggleScreen() {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+                showToast("Screen sharing not supported on this device/browser.");
+                return;
+            }
+
             if (!screenStream) {
                 try {
-                    screenStream = await navigator.mediaDevices.getDisplayMedia({ cursor: true });
+                    // Optimized for video sharing with audio
+                    screenStream = await navigator.mediaDevices.getDisplayMedia({ 
+                        video: { cursor: "always", frameRate: 30 }, 
+                        audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 44100 }
+                    });
+                    
                     const screenTrack = screenStream.getVideoTracks()[0];
-                    const sender = peerConnection.getSenders().find(s => s.track.kind === 'video');
-                    if(sender) sender.replaceTrack(screenTrack);
+                    
+                    // Replace video track for remote peer
+                    if (peerConnection) {
+                        const sender = peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+                        if(sender) sender.replaceTrack(screenTrack);
+                    }
+                    
+                    // Show local preview of screen
                     localVideo.srcObject = screenStream;
+                    
+                    // UI Update
                     document.getElementById('btn-screen').classList.replace('bg-slate-800', 'bg-blue-600');
-                    screenTrack.onended = () => toggleScreen();
+                    
+                    screenTrack.onended = () => stopScreenSharing();
                 } catch (err) {
-                    console.error(err);
+                    console.error("Screen Share Error:", err);
+                    if (err.name !== 'NotAllowedError') {
+                        showToast("Failed to start screen share.");
+                    }
                 }
             } else {
-                screenStream.getTracks().forEach(track => track.stop());
-                screenStream = null;
-                const videoTrack = localStream.getVideoTracks()[0];
-                const sender = peerConnection.getSenders().find(s => s.track.kind === 'video');
-                if(sender) sender.replaceTrack(videoTrack);
-                localVideo.srcObject = localStream;
-                document.getElementById('btn-screen').classList.replace('bg-blue-600', 'bg-slate-800');
+                stopScreenSharing();
             }
+        }
+
+        function stopScreenSharing() {
+            if (!screenStream) return;
+            
+            screenStream.getTracks().forEach(track => track.stop());
+            screenStream = null;
+
+            if (localStream) {
+                localVideo.srcObject = localStream;
+                if (peerConnection) {
+                    const sender = peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+                    if(sender) sender.replaceTrack(localStream.getVideoTracks()[0]);
+                }
+            }
+
+            document.getElementById('btn-screen').classList.replace('bg-blue-600', 'bg-slate-800');
         }
 
         function toggleMic() {
@@ -763,6 +860,7 @@
 
         function endCall() {
             if(peerConnection) peerConnection.close();
+            stopNetworkMonitor();
             window.location.reload();
         }
 
@@ -770,7 +868,6 @@
             const el = document.getElementById(id);
             const text = el.value;
             
-            // Modern API attempt
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 try {
                     await navigator.clipboard.writeText(text);
@@ -782,7 +879,6 @@
                 }
             }
 
-            // Fallback
             el.select();
             document.execCommand('copy');
             showToast("Code copied! (Manual selection)");
